@@ -28,11 +28,30 @@ import requests
 # del mismo canal, sin importar qué proveedor las genere.
 # ---------------------------------------------------------------------------
 ESTILO_BASE = (
-    "cinematic documentary photography, investigative journalism aesthetic, "
-    "desaturated cold color grading, deep blues and grays, dramatic low-key "
-    "lighting, film grain, 35mm lens look, somber and serious tone, "
-    "photorealistic, high detail, no text, no watermark, no logos"
+    "flat vector infographic illustration, bold flat colors, minimalist "
+    "flat design, simple geometric icons, clean modern explainer-video "
+    "style, high contrast, thick outlines, simple stick-figure or "
+    "flat-icon characters when a person is needed, no photorealism, "
+    "no gradients clutter, no text, no watermark, no logos, "
+    "no detailed faces, no detailed hands, single clear focal subject "
+    "centered in frame"
 )
+
+# Palabras a evitar en los prompts de escena (se filtran antes de enviar,
+# porque son las que más fallos de caras/manos provocan en estos modelos):
+PALABRAS_A_EVITAR = [
+    "close-up face", "closeup face", "portrait", "detailed face",
+    "person's face", "man's face", "woman's face", "crying face",
+    "screaming", "detailed hands", "hands close up",
+]
+
+
+def _limpiar_prompt(prompt: str) -> str:
+    """Quita frases que suelen disparar caras/manos deformes en modelos gratis."""
+    prompt_limpio = prompt
+    for palabra in PALABRAS_A_EVITAR:
+        prompt_limpio = prompt_limpio.replace(palabra, "")
+    return prompt_limpio.strip()
 
 # Prompts de prueba para validar el estilo antes de seguir construyendo
 PROMPTS_TEST = [
@@ -69,7 +88,7 @@ def _intentar_pollinations(prompt_completo: str, ruta_salida: str, semilla: int)
     prompt_codificado = urllib.parse.quote(prompt_completo)
     url = (
         f"https://image.pollinations.ai/prompt/{prompt_codificado}"
-        f"?width=1280&height=720&seed={semilla}&nologo=true&model=flux"
+        f"?width=1920&height=1080&seed={semilla}&nologo=true&model=flux"
     )
     try:
         resp = requests.get(url, timeout=TIMEOUT)
@@ -143,7 +162,7 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) ->
     if semilla is None:
         semilla = int(time.time()) % 100000
 
-    prompt_completo = f"{ESTILO_BASE}, {prompt_escena}"
+    prompt_completo = f"{ESTILO_BASE}, {_limpiar_prompt(prompt_escena)}"
 
     # --- Proveedor 1: Pollinations, con reintentos ---
     for intento in range(1, MAX_REINTENTOS + 1):
