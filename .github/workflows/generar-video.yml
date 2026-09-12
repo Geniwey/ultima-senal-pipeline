@@ -25,7 +25,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
       - name: Instalar dependencias Python
-        run: pip install requests groq edge-tts faster-whisper
+        run: pip install requests groq openai edge-tts faster-whisper
 
       - name: Ejecutar pipeline completo
         env:
