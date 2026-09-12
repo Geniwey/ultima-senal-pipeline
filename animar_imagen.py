@@ -25,6 +25,9 @@ VARIANTES = [
 
 def animar_imagen(ruta_imagen: str, duracion_segundos: float, ruta_salida: str,
                    indice_variante: int, texto_pantalla: str = None):
+    if os.path.exists(ruta_salida) and os.path.getsize(ruta_salida) > 10_000:
+        return ruta_salida  # ya generado (permite reanudar sin repetir trabajo)
+
     variante = VARIANTES[indice_variante % len(VARIANTES)]
     num_frames = max(int(duracion_segundos * FPS), FPS)
 
@@ -67,11 +70,12 @@ def animar_imagen(ruta_imagen: str, duracion_segundos: float, ruta_salida: str,
         ruta_salida,
     ]
 
-    resultado = subprocess.run(comando, capture_output=True, text=True)
-    if resultado.returncode != 0 or not os.path.exists(ruta_salida):
-        raise RuntimeError(f"FFmpeg falló animando {ruta_imagen}:\n{resultado.stderr[-800:]}")
-
-    return ruta_salida
+    for intento in range(2):
+        resultado = subprocess.run(comando, capture_output=True, text=True)
+        if resultado.returncode == 0 and os.path.exists(ruta_salida):
+            return ruta_salida
+        print(f"  ⚠ FFmpeg falló animando {ruta_imagen} (intento {intento+1}/2)")
+    raise RuntimeError(f"FFmpeg falló animando {ruta_imagen} tras 2 intentos:\n{resultado.stderr[-800:]}")
 
 
 def animar_todas(info_escenas: list, carpeta_imagenes: str, carpeta_salida: str) -> list:
