@@ -38,11 +38,15 @@ Devuelve SOLO un JSON válido, sin texto adicional, con esta forma exacta:
 {
   "titulo_video": "...",
   "escenas": [
-    {"texto_narracion": "...", "prompt_imagen": "descripción visual en inglés, sin texto en pantalla, sin logos"}
+    {
+      "texto_narracion": "una frase corta, entre 8 y 18 palabras — esto se lee en voz y dura entre 4 y 6 segundos",
+      "texto_pantalla": "titular muy corto, 2 a 6 palabras, MAYÚSCULAS, resume el punto clave de esta frase para mostrarlo como texto en pantalla",
+      "prompt_imagen": "descripción visual en inglés de un icono/ilustración plana simple que represente esta idea, sin texto en la imagen, sin logos"
+    }
   ]
 }
 
-El guion completo debe sumar entre 1000 y 1400 palabras de narración (para un vídeo de ~8 minutos), dividido en 12 a 18 escenas.
+Cada escena representa entre 4 y 6 segundos de vídeo (una frase corta cada vez, como un explicador de ritmo rápido, cambiando de imagen constantemente — NO bloques largos de varias frases juntas). Para un vídeo de ~8 minutos esto significa entre 80 y 110 escenas cortas, no 12-18 escenas largas.
 """
 
 
@@ -54,7 +58,7 @@ def _llamar_groq(cliente: Groq, tema: str, modelo: str) -> str:
             {"role": "user", "content": f"Tema del vídeo: {tema}"},
         ],
         temperature=0.6,
-        max_tokens=6000,
+        max_tokens=16000,
     )
     return respuesta.choices[0].message.content
 
@@ -73,7 +77,7 @@ def _llamar_cerebras(tema: str) -> str:
             {"role": "user", "content": f"Tema del vídeo: {tema}"},
         ],
         temperature=0.6,
-        max_tokens=6000,
+        max_tokens=16000,
     )
     return respuesta.choices[0].message.content
 
@@ -96,7 +100,7 @@ def generar_guion(tema: str) -> dict:
             print(f"Generando guion con Groq/{modelo}...")
             texto = _llamar_groq(cliente, tema, modelo)
             datos = _limpiar_y_parsear(texto)
-            if "escenas" in datos and len(datos["escenas"]) >= 8:
+            if "escenas" in datos and len(datos["escenas"]) >= 40:
                 return datos
             print(f"  Respuesta incompleta con {modelo}, probando siguiente...")
         except Exception as e:
@@ -107,7 +111,7 @@ def generar_guion(tema: str) -> dict:
         print(f"Groq falló, probando Cerebras/{MODELO_CEREBRAS}...")
         texto = _llamar_cerebras(tema)
         datos = _limpiar_y_parsear(texto)
-        if "escenas" in datos and len(datos["escenas"]) >= 8:
+        if "escenas" in datos and len(datos["escenas"]) >= 40:
             return datos
         print("  Respuesta incompleta con Cerebras también.")
     except Exception as e:
