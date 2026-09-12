@@ -9,17 +9,35 @@ Requiere:
 """
 
 import sys
+import time
 from faster_whisper import WhisperModel
 
 MODELO = "medium"  # "small" si la máquina va justa de recursos, "medium" da mejor precisión en español
+MODELO_RESPALDO = "small"  # si "medium" falla (poca RAM u otro fallo), probamos uno más ligero
+
+
+def _transcribir_con(ruta_audio: str, modelo_nombre: str):
+    modelo = WhisperModel(modelo_nombre, device="cpu", compute_type="int8")
+    segmentos, _ = modelo.transcribe(ruta_audio, language="es", vad_filter=True)
+    return list(segmentos)  # forzamos a lista ya para detectar errores aquí, no al escribir
 
 
 def generar_srt(ruta_audio: str, ruta_salida_srt: str):
-    print(f"Cargando modelo Whisper ({MODELO})...")
-    modelo = WhisperModel(MODELO, device="cpu", compute_type="int8")
+    segmentos = None
+    for modelo_nombre in (MODELO, MODELO_RESPALDO):
+        for intento in range(2):
+            try:
+                print(f"Cargando modelo Whisper ({modelo_nombre}), intento {intento+1}/2...")
+                segmentos = _transcribir_con(ruta_audio, modelo_nombre)
+                break
+            except Exception as e:
+                print(f"  ⚠ Fallo con Whisper/{modelo_nombre}: {e}")
+                time.sleep(3)
+        if segmentos is not None:
+            break
 
-    print("Transcribiendo...")
-    segmentos, _ = modelo.transcribe(ruta_audio, language="es", vad_filter=True)
+    if segmentos is None:
+        raise RuntimeError("Whisper falló con ambos modelos (medium y small) tras varios intentos")
 
     def formatear_tiempo(segundos: float) -> str:
         h = int(segundos // 3600)
