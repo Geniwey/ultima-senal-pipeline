@@ -55,7 +55,7 @@ def montar_video_final(carpeta_clips: str, carpeta_audios: str, ruta_srt: str,
     _concatenar_audios(rutas_audios, audio_temp)
 
     print("Uniendo audio + vídeo y quemando subtítulos...")
-    filtro_subs = f"subtitles={ruta_srt}:force_style='FontName=Arial,FontSize=20,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=1,Outline=2,Alignment=2,MarginV=60'"
+    filtro_subs = f"subtitles={ruta_srt}:force_style='FontName=DejaVu Sans,FontSize=20,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=1,Outline=2,Alignment=2,MarginV=60'"
 
     comando = [
         "ffmpeg", "-y", "-i", video_temp, "-i", audio_temp,
@@ -66,13 +66,19 @@ def montar_video_final(carpeta_clips: str, carpeta_audios: str, ruta_srt: str,
         "-shortest",
         ruta_salida,
     ]
-    resultado = subprocess.run(comando, capture_output=True, text=True)
+
+    resultado = None
+    for intento in range(2):
+        resultado = subprocess.run(comando, capture_output=True, text=True)
+        if resultado.returncode == 0 and os.path.exists(ruta_salida):
+            break
+        print(f"  ⚠ Fallo en el montaje final (intento {intento+1}/2), reintentando...")
 
     os.remove(video_temp)
     os.remove(audio_temp)
 
     if resultado.returncode != 0 or not os.path.exists(ruta_salida):
-        raise RuntimeError(f"Fallo en el montaje final:\n{resultado.stderr[-1000:]}")
+        raise RuntimeError(f"Fallo en el montaje final tras 2 intentos:\n{resultado.stderr[-1000:]}")
 
     print(f"✓ Vídeo final listo: {ruta_salida}")
     return ruta_salida
