@@ -84,6 +84,8 @@ def _llamar_cerebras(tema: str) -> str:
 
 
 def _limpiar_y_parsear(texto: str) -> dict:
+    if not texto or not texto.strip():
+        raise ValueError("Respuesta vacía del modelo")
     texto = texto.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
     return json.loads(texto)
 
