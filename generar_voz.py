@@ -63,6 +63,7 @@ def generar_voces(ruta_guion: str, carpeta_salida: str) -> list:
             "ruta_audio": ruta_audio,
             "duracion_segundos": duracion,
             "prompt_imagen": escena["prompt_imagen"],
+            "texto_pantalla": escena.get("texto_pantalla", ""),
         })
 
     ruta_info = os.path.join(carpeta_salida, "info_escenas.json")
