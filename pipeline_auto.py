@@ -12,6 +12,7 @@ Uso:
 import os
 import sys
 import json
+import time
 
 from generar_guion import generar_guion
 from generar_imagen import generar_imagen
@@ -41,17 +42,28 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
     print("\n=== 3/6: Imágenes ===")
     carpeta_imagenes = os.path.join(carpeta_proyecto, "imagenes")
     os.makedirs(carpeta_imagenes, exist_ok=True)
-    fallos = []
-    for escena in info_escenas:
-        ruta_img = os.path.join(carpeta_imagenes, f"escena_{escena['indice']:02d}.png")
-        print(f"  Escena {escena['indice']}/{len(info_escenas)}")
-        if not generar_imagen(escena["prompt_imagen"], ruta_img):
-            fallos.append(escena["indice"])
-    if fallos:
-        # Los 3 proveedores fallaron para alguna escena: paramos el workflow
-        # entero en vez de entregar un vídeo con huecos. Mejor que falle
-        # visible a que llegue un vídeo roto sin que te des cuenta.
-        raise RuntimeError(f"Fallaron las imágenes de las escenas {fallos} tras agotar los 3 proveedores")
+
+    def _generar_todas(lista_escenas):
+        fallidas = []
+        for escena in lista_escenas:
+            ruta_img = os.path.join(carpeta_imagenes, f"escena_{escena['indice']:02d}.png")
+            print(f"  Escena {escena['indice']}/{len(info_escenas)}")
+            if not generar_imagen(escena["prompt_imagen"], ruta_img):
+                fallidas.append(escena)
+            time.sleep(1.5)  # pequeña pausa entre peticiones, para no saturar los proveedores
+        return fallidas
+
+    fallidas = _generar_todas(info_escenas)
+
+    if fallidas:
+        print(f"\n⚠ {len(fallidas)} escenas fallaron en la primera pasada. "
+              f"Esperando 90s antes de reintentar (para que se liberen los límites de los proveedores)...")
+        time.sleep(90)
+        fallidas = _generar_todas(fallidas)
+
+    if fallidas:
+        indices = [e["indice"] for e in fallidas]
+        raise RuntimeError(f"Fallaron las imágenes de las escenas {indices} tras agotar los 3 proveedores, dos pasadas")
 
     # 4. ANIMACIÓN
     print("\n=== 4/6: Animación (Ken Burns) ===")
