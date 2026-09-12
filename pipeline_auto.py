@@ -47,10 +47,11 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
         fallidas = []
         for escena in lista_escenas:
             ruta_img = os.path.join(carpeta_imagenes, f"escena_{escena['indice']:02d}.png")
+            if os.path.exists(ruta_img) and os.path.getsize(ruta_img) > 10_000:
+                continue  # ya generada en un intento/ejecución anterior
             print(f"  Escena {escena['indice']}/{len(info_escenas)}")
             if not generar_imagen(escena["prompt_imagen"], ruta_img):
                 fallidas.append(escena)
-            time.sleep(1.5)  # pequeña pausa entre peticiones, para no saturar los proveedores
         return fallidas
 
     fallidas = _generar_todas(info_escenas)
