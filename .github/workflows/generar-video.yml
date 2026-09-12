@@ -11,7 +11,7 @@ on:
 jobs:
   generar-video:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - name: Checkout del repo
         uses: actions/checkout@v4
@@ -27,6 +27,14 @@ jobs:
       - name: Instalar dependencias Python
         run: pip install requests groq openai edge-tts faster-whisper
 
+      - name: Recuperar progreso de intentos anteriores (mismo título)
+        uses: actions/cache@v4
+        with:
+          path: proyecto
+          key: ultima-senal-${{ inputs.titulo }}-${{ github.run_id }}
+          restore-keys: |
+            ultima-senal-${{ inputs.titulo }}-
+
       - name: Ejecutar pipeline completo
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -36,6 +44,7 @@ jobs:
         run: python pipeline_auto.py "${{ inputs.titulo }}"
 
       - name: Subir vídeo final
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: video-${{ github.run_id }}
