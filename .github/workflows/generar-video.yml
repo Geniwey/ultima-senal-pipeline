@@ -42,6 +42,7 @@ jobs:
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
           POLLINATIONS_API_TOKEN: ${{ secrets.POLLINATIONS_API_TOKEN }}
+          MODELSLAB_API_KEY: ${{ secrets.MODELSLAB_API_KEY }}
         run: python pipeline_auto.py "${{ inputs.titulo }}"
 
       - name: Subir vídeo final
