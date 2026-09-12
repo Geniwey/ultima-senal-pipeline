@@ -96,7 +96,7 @@ def _validar_imagen(ruta: str) -> bool:
     return es_png or es_jpeg
 
 
-def _intentar_pollinations(prompt_completo: str, ruta_salida: str, semilla: int) -> bool:
+def _intentar_pollinations(prompt_completo: str, ruta_salida: str, semilla: int, ancho: int = 1920, alto: int = 1080) -> bool:
     token = os.environ.get("POLLINATIONS_API_TOKEN")
 
     # Con token registrado, el límite de 1 petición/15-16s no aplica (o es
@@ -110,7 +110,7 @@ def _intentar_pollinations(prompt_completo: str, ruta_salida: str, semilla: int)
     prompt_codificado = urllib.parse.quote(prompt_completo)
     url = (
         f"https://image.pollinations.ai/prompt/{prompt_codificado}"
-        f"?width=1920&height=1080&seed={semilla}&nologo=true&model=flux"
+        f"?width={ancho}&height={alto}&seed={semilla}&nologo=true&model=flux"
     )
     if token:
         url += f"&token={token}"
@@ -193,6 +193,41 @@ def _intentar_huggingface(prompt_completo: str, ruta_salida: str) -> bool:
     return False
 
 
+def _intentar_modelslab(prompt_completo: str, ruta_salida: str) -> bool:
+    api_key = os.environ.get("MODELSLAB_API_KEY")
+    if not api_key:
+        print("  [ModelsLab] falta MODELSLAB_API_KEY, se salta este proveedor")
+        return False
+
+    url = "https://modelslab.com/api/v6/realtime/text2img"
+    payload = {
+        "key": api_key,
+        "prompt": prompt_completo,
+        "width": "1024",
+        "height": "576",
+        "samples": "1",
+        "safety_checker": False,
+    }
+    try:
+        resp = requests.post(url, json=payload, timeout=TIMEOUT)
+        if resp.status_code == 200:
+            data = resp.json()
+            urls = data.get("output") or []
+            if urls:
+                img_resp = requests.get(urls[0], timeout=TIMEOUT)
+                if img_resp.status_code == 200:
+                    with open(ruta_salida, "wb") as f:
+                        f.write(img_resp.content)
+                    return _validar_imagen(ruta_salida)
+            else:
+                print(f"  [ModelsLab] sin imagen en la respuesta: {resp.text[:200]}")
+        else:
+            print(f"  [ModelsLab] respuesta {resp.status_code}: {resp.text[:200]}")
+    except requests.RequestException as e:
+        print(f"  [ModelsLab] fallo de red: {e}")
+    return False
+
+
 def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) -> bool:
     """
     Genera una imagen para una escena, con reintentos y fallback de proveedor.
@@ -203,10 +238,13 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) ->
 
     prompt_completo = f"{ESTILO_BASE}, {_limpiar_prompt(prompt_escena)}"
 
-    # --- Proveedor 1: Pollinations, con reintentos ---
-    for intento in range(1, MAX_REINTENTOS + 1):
-        print(f"  Intento {intento}/{MAX_REINTENTOS} con Pollinations...")
-        if _intentar_pollinations(prompt_completo, ruta_salida, semilla + intento):
+    # --- Proveedor 1: Pollinations. Intento 1 a resolución completa;
+    # intento 2 a resolución reducida (degradación gradual: si la imagen
+    # grande tarda demasiado, una más pequeña tiene más margen de éxito) ---
+    resoluciones = [(1920, 1080), (1280, 720)]
+    for intento, (ancho, alto) in enumerate(resoluciones, start=1):
+        print(f"  Intento {intento}/{len(resoluciones)} con Pollinations ({ancho}x{alto})...")
+        if _intentar_pollinations(prompt_completo, ruta_salida, semilla + intento, ancho, alto):
             print("  ✓ Imagen válida generada con Pollinations")
             return True
         time.sleep(2)
@@ -217,13 +255,19 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) ->
         print("  ✓ Imagen válida generada con Cloudflare")
         return True
 
-    # --- Proveedor 3 (última red de seguridad): Hugging Face ---
-    print("  Cloudflare también falló, probando Hugging Face...")
+    # --- Proveedor 3 (fallback): ModelsLab (100 imágenes/día gratis) ---
+    print("  Cloudflare también falló, probando ModelsLab...")
+    if _intentar_modelslab(prompt_completo, ruta_salida):
+        print("  ✓ Imagen válida generada con ModelsLab")
+        return True
+
+    # --- Proveedor 4 (última red de seguridad): Hugging Face ---
+    print("  ModelsLab también falló, probando Hugging Face...")
     if _intentar_huggingface(prompt_completo, ruta_salida):
         print("  ✓ Imagen válida generada con Hugging Face")
         return True
 
-    print(f"  ✗ FALLO TOTAL (3 proveedores agotados) generando imagen para: {prompt_escena[:60]}...")
+    print(f"  ✗ FALLO TOTAL (4 proveedores agotados) generando imagen para: {prompt_escena[:60]}...")
     return False
 
 
