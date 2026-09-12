@@ -77,6 +77,7 @@ PROMPTS_TEST = [
 ]
 
 TIMEOUT = 25
+TIMEOUT_POLLINATIONS = 60  # 1920x1080 tarda más de 25s en generarse a menudo
 MAX_REINTENTOS = 2
 TAMANO_MINIMO_BYTES = 15_000  # por debajo de esto, la imagen casi seguro está rota/en blanco
 
@@ -96,19 +97,25 @@ def _validar_imagen(ruta: str) -> bool:
 
 
 def _intentar_pollinations(prompt_completo: str, ruta_salida: str, semilla: int) -> bool:
-    # Respetar el límite de ~1 petición/15s del modo anónimo de Pollinations
-    espera_necesaria = POLLINATIONS_ESPACIADO_SEGUNDOS - (time.time() - _ultima_llamada_pollinations[0])
-    if espera_necesaria > 0:
-        time.sleep(espera_necesaria)
-    _ultima_llamada_pollinations[0] = time.time()
+    token = os.environ.get("POLLINATIONS_API_TOKEN")
+
+    # Con token registrado, el límite de 1 petición/15-16s no aplica (o es
+    # mucho más alto) — solo frenamos en modo anónimo, sin token.
+    if not token:
+        espera_necesaria = POLLINATIONS_ESPACIADO_SEGUNDOS - (time.time() - _ultima_llamada_pollinations[0])
+        if espera_necesaria > 0:
+            time.sleep(espera_necesaria)
+        _ultima_llamada_pollinations[0] = time.time()
 
     prompt_codificado = urllib.parse.quote(prompt_completo)
     url = (
         f"https://image.pollinations.ai/prompt/{prompt_codificado}"
         f"?width=1920&height=1080&seed={semilla}&nologo=true&model=flux"
     )
+    if token:
+        url += f"&token={token}"
     try:
-        resp = requests.get(url, timeout=TIMEOUT)
+        resp = requests.get(url, timeout=TIMEOUT_POLLINATIONS)
         if resp.status_code == 200 and len(resp.content) > TAMANO_MINIMO_BYTES:
             with open(ruta_salida, "wb") as f:
                 f.write(resp.content)
@@ -134,12 +141,11 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
     )
     headers = {"Authorization": f"Bearer {api_token}"}
     try:
-        # Pedimos resolución más baja para gastar menos cupo diario (10.000
-        # neuronas/día compartidas) — luego el paso de animación normaliza
-        # cualquier imagen a 1920x1080 igualmente.
+        # Confirmado con la documentación oficial de Cloudflare: este
+        # endpoint solo acepta prompt, seed y steps — nada de width/height.
         resp = requests.post(
             url, headers=headers,
-            json={"prompt": prompt_completo, "width": 1024, "height": 576},
+            json={"prompt": prompt_completo, "steps": 8},
             timeout=TIMEOUT,
         )
         if resp.status_code == 200:
