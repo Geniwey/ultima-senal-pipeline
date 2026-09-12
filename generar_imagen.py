@@ -22,6 +22,17 @@ import time
 import urllib.parse
 import requests
 
+# Cuánto esperar entre peticiones consecutivas a Pollinations en modo anónimo
+# (sin esto, Pollinations empieza a fallar con timeouts y todo cae sobre
+# Cloudflare, que entonces agota su cupo diario mucho antes de tiempo)
+POLLINATIONS_ESPACIADO_SEGUNDOS = 16
+_ultima_llamada_pollinations = [0.0]  # lista para poder mutarla desde la función
+
+# Si Cloudflare responde que ha agotado su cupo diario, no tiene sentido
+# seguir intentándolo el resto de la ejecución (no se libera hasta las
+# 00:00 UTC) — lo marcamos y lo saltamos directamente para no perder tiempo.
+_cloudflare_agotado = [False]
+
 # ---------------------------------------------------------------------------
 # ESTILO VISUAL DEL CANAL — esto es lo que le da identidad a "Última Señal"
 # Se antepone a cada prompt de escena para que TODAS las imágenes se vean
@@ -85,6 +96,12 @@ def _validar_imagen(ruta: str) -> bool:
 
 
 def _intentar_pollinations(prompt_completo: str, ruta_salida: str, semilla: int) -> bool:
+    # Respetar el límite de ~1 petición/15s del modo anónimo de Pollinations
+    espera_necesaria = POLLINATIONS_ESPACIADO_SEGUNDOS - (time.time() - _ultima_llamada_pollinations[0])
+    if espera_necesaria > 0:
+        time.sleep(espera_necesaria)
+    _ultima_llamada_pollinations[0] = time.time()
+
     prompt_codificado = urllib.parse.quote(prompt_completo)
     url = (
         f"https://image.pollinations.ai/prompt/{prompt_codificado}"
@@ -102,6 +119,9 @@ def _intentar_pollinations(prompt_completo: str, ruta_salida: str, semilla: int)
 
 
 def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
+    if _cloudflare_agotado[0]:
+        return False  # ya sabemos que se quedó sin cupo hoy, no perdemos tiempo reintentando
+
     account_id = os.environ.get("CF_ACCOUNT_ID")
     api_token = os.environ.get("CF_API_TOKEN")
     if not account_id or not api_token:
@@ -114,12 +134,16 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
     )
     headers = {"Authorization": f"Bearer {api_token}"}
     try:
+        # Pedimos resolución más baja para gastar menos cupo diario (10.000
+        # neuronas/día compartidas) — luego el paso de animación normaliza
+        # cualquier imagen a 1920x1080 igualmente.
         resp = requests.post(
-            url, headers=headers, json={"prompt": prompt_completo}, timeout=TIMEOUT
+            url, headers=headers,
+            json={"prompt": prompt_completo, "width": 1024, "height": 576},
+            timeout=TIMEOUT,
         )
         if resp.status_code == 200:
             data = resp.json()
-            # Cloudflare devuelve la imagen en base64 dentro de result.image
             import base64
             b64_img = data.get("result", {}).get("image")
             if b64_img:
@@ -128,6 +152,9 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
                 return _validar_imagen(ruta_salida)
         else:
             print(f"  [Cloudflare] respuesta {resp.status_code}: {resp.text[:200]}")
+            if resp.status_code == 429 and "daily free allocation" in resp.text:
+                print("  [Cloudflare] cupo diario agotado — se salta este proveedor el resto de la ejecución")
+                _cloudflare_agotado[0] = True
     except requests.RequestException as e:
         print(f"  [Cloudflare] fallo de red: {e}")
     return False
@@ -139,8 +166,9 @@ def _intentar_huggingface(prompt_completo: str, ruta_salida: str) -> bool:
         print("  [Hugging Face] falta HF_API_TOKEN, se salta este proveedor")
         return False
 
-    # Endpoint nuevo (el antiguo api-inference.huggingface.co fue retirado)
-    url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
+    # FLUX.1-schnell fue retirado del servicio gratis de HF; usamos SDXL,
+    # que lleva más tiempo estable en su catálogo gratuito.
+    url = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0"
     headers = {"Authorization": f"Bearer {api_token}"}
     try:
         resp = requests.post(
