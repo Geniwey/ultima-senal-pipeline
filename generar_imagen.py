@@ -126,6 +126,8 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
                 with open(ruta_salida, "wb") as f:
                     f.write(base64.b64decode(b64_img))
                 return _validar_imagen(ruta_salida)
+        else:
+            print(f"  [Cloudflare] respuesta {resp.status_code}: {resp.text[:200]}")
     except requests.RequestException as e:
         print(f"  [Cloudflare] fallo de red: {e}")
     return False
@@ -137,7 +139,8 @@ def _intentar_huggingface(prompt_completo: str, ruta_salida: str) -> bool:
         print("  [Hugging Face] falta HF_API_TOKEN, se salta este proveedor")
         return False
 
-    url = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
+    # Endpoint nuevo (el antiguo api-inference.huggingface.co fue retirado)
+    url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
     headers = {"Authorization": f"Bearer {api_token}"}
     try:
         resp = requests.post(
@@ -149,6 +152,8 @@ def _intentar_huggingface(prompt_completo: str, ruta_salida: str) -> bool:
             return _validar_imagen(ruta_salida)
         if resp.status_code == 503:
             print("  [Hugging Face] modelo cargando (cold start), no da tiempo en este intento")
+        else:
+            print(f"  [Hugging Face] respuesta {resp.status_code}: {resp.text[:200]}")
     except requests.RequestException as e:
         print(f"  [Hugging Face] fallo de red: {e}")
     return False
