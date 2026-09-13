@@ -75,6 +75,13 @@ TAMANO_MINIMO_BYTES = 15_000
 _cloudflare_agotado = [False]
 _gemini_agotado = [False]
 
+# Margen prudente entre peticiones a Nano Banana para no toparnos con su
+# límite de peticiones/minuto del plan gratis (más generoso que el de
+# Pollinations, pero sigue existiendo) — así 100 imágenes tardan unos
+# 10-12 min, no 25+.
+GEMINI_ESPACIADO_SEGUNDOS = 6.5
+_ultima_llamada_gemini = [0.0]
+
 
 def _validar_imagen(ruta: str) -> bool:
     if not os.path.exists(ruta):
@@ -94,6 +101,11 @@ def _intentar_gemini(prompt_completo: str, ruta_salida: str) -> bool:
     if not api_key:
         print("  [Nano Banana] falta GEMINI_API_KEY, se salta este proveedor")
         return False
+
+    espera_necesaria = GEMINI_ESPACIADO_SEGUNDOS - (time.time() - _ultima_llamada_gemini[0])
+    if espera_necesaria > 0:
+        time.sleep(espera_necesaria)
+    _ultima_llamada_gemini[0] = time.time()
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
