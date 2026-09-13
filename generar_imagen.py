@@ -107,30 +107,39 @@ def _intentar_gemini(prompt_completo: str, ruta_salida: str) -> bool:
         time.sleep(espera_necesaria)
     _ultima_llamada_gemini[0] = time.time()
 
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-2.5-flash-image:generateContent?key={api_key}"
-    )
+    headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
     payload = {"contents": [{"parts": [{"text": prompt_completo}]}]}
-    try:
-        resp = requests.post(url, json=payload, timeout=TIMEOUT)
-        if resp.status_code == 200:
-            data = resp.json()
-            partes = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-            for parte in partes:
-                inline = parte.get("inlineData") or parte.get("inline_data")
-                if inline and inline.get("data"):
-                    with open(ruta_salida, "wb") as f:
-                        f.write(base64.b64decode(inline["data"]))
-                    return _validar_imagen(ruta_salida)
-            print(f"  [Nano Banana] respuesta sin imagen: {resp.text[:200]}")
-        elif resp.status_code == 429:
-            print(f"  [Nano Banana] límite alcanzado, se salta el resto de esta ejecución: {resp.text[:150]}")
-            _gemini_agotado[0] = True
-        else:
-            print(f"  [Nano Banana] respuesta {resp.status_code}: {resp.text[:200]}")
-    except requests.RequestException as e:
-        print(f"  [Nano Banana] fallo de red: {e}")
+
+    # gemini-2.5-flash-image (el "legacy") está siendo retirado por Google
+    # (cierre el 2 de octubre de 2026) y ya da 404 de forma intermitente.
+    # Usamos el modelo vigente — Nano Banana 2 Lite — como principal, con
+    # Nano Banana 2 normal como segundo intento dentro del propio Gemini.
+    modelos = ["gemini-3.1-flash-lite-image", "gemini-3.1-flash-image"]
+    for modelo in modelos:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=TIMEOUT)
+            if resp.status_code == 200:
+                data = resp.json()
+                partes = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                for parte in partes:
+                    inline = parte.get("inlineData") or parte.get("inline_data")
+                    if inline and inline.get("data"):
+                        with open(ruta_salida, "wb") as f:
+                            f.write(base64.b64decode(inline["data"]))
+                        return _validar_imagen(ruta_salida)
+                print(f"  [Nano Banana/{modelo}] respuesta sin imagen: {resp.text[:200]}")
+            elif resp.status_code == 429:
+                print(f"  [Nano Banana/{modelo}] límite alcanzado: {resp.text[:150]}")
+                _gemini_agotado[0] = True
+                return False
+            elif resp.status_code == 404:
+                print(f"  [Nano Banana/{modelo}] modelo no encontrado (404), probando el siguiente...")
+                continue
+            else:
+                print(f"  [Nano Banana/{modelo}] respuesta {resp.status_code}: {resp.text[:200]}")
+        except requests.RequestException as e:
+            print(f"  [Nano Banana/{modelo}] fallo de red: {e}")
     return False
 
 
