@@ -25,7 +25,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
       - name: Instalar dependencias Python
-        run: pip install requests groq openai edge-tts faster-whisper
+        run: pip install requests groq openai edge-tts
 
       - name: Recuperar progreso de intentos anteriores (mismo título)
         uses: actions/cache@v4
@@ -41,8 +41,8 @@ jobs:
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
-          POLLINATIONS_API_TOKEN: ${{ secrets.POLLINATIONS_API_TOKEN }}
           MODELSLAB_API_KEY: ${{ secrets.MODELSLAB_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python pipeline_auto.py "${{ inputs.titulo }}"
 
       - name: Subir vídeo final
