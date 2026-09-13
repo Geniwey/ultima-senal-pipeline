@@ -18,8 +18,7 @@ from generar_guion import generar_guion
 from generar_imagen import generar_imagen
 from generar_voz import generar_voces
 from animar_imagen import animar_todas
-from generar_subtitulos import generar_srt
-from montar_video import montar_video_final, _concatenar_audios
+from montar_video import montar_video_final
 
 
 def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
@@ -71,19 +70,14 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
     carpeta_clips = os.path.join(carpeta_proyecto, "clips")
     animar_todas(info_escenas, carpeta_imagenes, carpeta_clips)
 
-    # 5. SUBTÍTULOS
-    print("\n=== 5/6: Subtítulos ===")
-    audio_completo = os.path.join(carpeta_proyecto, "audio_completo_temp.mp3")
-    _concatenar_audios([e["ruta_audio"] for e in info_escenas], audio_completo)
-    ruta_srt = os.path.join(carpeta_proyecto, "subtitulos.srt")
-    generar_srt(audio_completo, ruta_srt)
-    os.remove(audio_completo)
-
-    # 6. MONTAJE FINAL
-    print("\n=== 6/6: Montaje final ===")
+    # 5. MONTAJE FINAL
+    # (ya no generamos subtítulos completos con Whisper — se quedaba
+    # solapado con el titular corto en pantalla, duplicando el texto.
+    # El titular ya cumple esa función de forma más limpia)
+    print("\n=== 5/5: Montaje final ===")
     ruta_final = os.path.join(carpeta_proyecto, "video_final.mp4")
     info_escenas_path = os.path.join(carpeta_audio, "info_escenas.json")
-    montar_video_final(carpeta_clips, carpeta_audio, ruta_srt, ruta_final, info_escenas_path)
+    montar_video_final(carpeta_clips, carpeta_audio, ruta_final, info_escenas_path)
 
     print(f"\n✓✓✓ COMPLETO: {ruta_final}")
     return ruta_final
