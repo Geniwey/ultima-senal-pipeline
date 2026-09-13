@@ -2,7 +2,9 @@
 Última Señal — Montaje final
 ===============================
 Une los clips animados en orden, concatena todos los audios de voz,
-sincroniza, quema los subtítulos y exporta el vídeo final listo para subir.
+sincroniza y exporta el vídeo final listo para subir. El texto en pantalla
+ya viene quemado en cada clip (paso de animación) como titular corto —
+no se añaden subtítulos completos aparte, para no duplicar el texto.
 """
 
 import subprocess
@@ -38,7 +40,7 @@ def _concatenar_video(rutas_clips: list, ruta_salida: str):
         raise RuntimeError(f"Fallo concatenando vídeo:\n{resultado.stderr[-800:]}")
 
 
-def montar_video_final(carpeta_clips: str, carpeta_audios: str, ruta_srt: str,
+def montar_video_final(carpeta_clips: str, carpeta_audios: str,
                         ruta_salida: str, info_escenas_path: str):
     with open(info_escenas_path, "r", encoding="utf-8") as f:
         info_escenas = json.load(f)
@@ -54,12 +56,9 @@ def montar_video_final(carpeta_clips: str, carpeta_audios: str, ruta_srt: str,
     audio_temp = ruta_salida + "_audio_temp.mp3"
     _concatenar_audios(rutas_audios, audio_temp)
 
-    print("Uniendo audio + vídeo y quemando subtítulos...")
-    filtro_subs = f"subtitles={ruta_srt}:force_style='FontName=DejaVu Sans,FontSize=20,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=1,Outline=2,Alignment=2,MarginV=60'"
-
+    print("Uniendo audio + vídeo...")
     comando = [
         "ffmpeg", "-y", "-i", video_temp, "-i", audio_temp,
-        "-vf", filtro_subs,
         "-c:v", "libx264", "-crf", "18", "-preset", "medium",
         "-c:a", "aac", "-b:a", "192k",
         "-map", "0:v:0", "-map", "1:a:0",
