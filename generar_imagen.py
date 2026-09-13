@@ -1,42 +1,35 @@
 """
-Última Señal — Generador de imágenes con fallback automático (3 proveedores)
+Última Señal — Generador de imágenes con fallback automático (4 proveedores)
 ================================================================================
-Intento 1: Pollinations.ai (gratis, sin key, pero inestable)
-Intento 2: Cloudflare Workers AI - Flux Schnell (gratis con cuota diaria, más estable)
-Intento 3: Hugging Face Serverless Inference API - Flux Schnell (gratis con rate-limit,
-           tercera red de seguridad por si los dos anteriores fallan a la vez)
+Intento 1: Nano Banana / Gemini 2.5 Flash Image (Google) - gratis, 500/día,
+           la mejor calidad de las opciones gratuitas disponibles.
+           AVISO LEGAL: las condiciones de la API gratuita de Gemini prohíben
+           servir a usuarios de la UE/EEE. Se usa aquí bajo tu propio criterio
+           para un proyecto personal de bajo volumen — ver conversación.
+Intento 2: Cloudflare Workers AI - Flux Schnell (gratis, cuota diaria)
+Intento 3: ModelsLab (gratis, 100 imágenes/día)
+Intento 4: Hugging Face (última red de seguridad, modelo variable)
 
 Uso:
     python generar_imagen.py "prompt de la escena" salida.png
     python generar_imagen.py --test   # genera 4 imágenes de prueba con el estilo del canal
 
 Configuración necesaria (variables de entorno):
-    CF_ACCOUNT_ID   -> ID de cuenta de Cloudflare
-    CF_API_TOKEN    -> Token de API de Cloudflare Workers AI (gratis, se crea en dashboard)
-    HF_API_TOKEN    -> Token de Hugging Face (gratis, se crea en huggingface.co/settings/tokens)
+    GEMINI_API_KEY   -> clave gratis de aistudio.google.com (Nano Banana)
+    CF_ACCOUNT_ID    -> ID de cuenta de Cloudflare
+    CF_API_TOKEN     -> Token de API de Cloudflare Workers AI
+    MODELSLAB_API_KEY-> clave gratis de modelslab.com
+    HF_API_TOKEN     -> Token de Hugging Face (opcional, último recurso)
 """
 
 import os
 import sys
 import time
-import urllib.parse
+import base64
 import requests
 
-# Cuánto esperar entre peticiones consecutivas a Pollinations en modo anónimo
-# (sin esto, Pollinations empieza a fallar con timeouts y todo cae sobre
-# Cloudflare, que entonces agota su cupo diario mucho antes de tiempo)
-POLLINATIONS_ESPACIADO_SEGUNDOS = 16
-_ultima_llamada_pollinations = [0.0]  # lista para poder mutarla desde la función
-
-# Si Cloudflare responde que ha agotado su cupo diario, no tiene sentido
-# seguir intentándolo el resto de la ejecución (no se libera hasta las
-# 00:00 UTC) — lo marcamos y lo saltamos directamente para no perder tiempo.
-_cloudflare_agotado = [False]
-
 # ---------------------------------------------------------------------------
-# ESTILO VISUAL DEL CANAL — esto es lo que le da identidad a "Última Señal"
-# Se antepone a cada prompt de escena para que TODAS las imágenes se vean
-# del mismo canal, sin importar qué proveedor las genere.
+# ESTILO VISUAL DEL CANAL
 # ---------------------------------------------------------------------------
 ESTILO_BASE = (
     "flat vector infographic illustration, bold flat colors, minimalist "
@@ -45,11 +38,12 @@ ESTILO_BASE = (
     "flat-icon characters when a person is needed, no photorealism, "
     "no gradients clutter, no text, no watermark, no logos, "
     "no detailed faces, no detailed hands, single clear focal subject "
-    "centered in frame"
+    "centered in frame, clearly recognizable everyday object or icon, "
+    "simple and literal illustration of the concept, not abstract art, "
+    "no abstract shapes, no non-representational geometric composition, "
+    "plain solid background"
 )
 
-# Palabras a evitar en los prompts de escena (se filtran antes de enviar,
-# porque son las que más fallos de caras/manos provocan en estos modelos):
 PALABRAS_A_EVITAR = [
     "close-up face", "closeup face", "portrait", "detailed face",
     "person's face", "man's face", "woman's face", "crying face",
@@ -58,13 +52,12 @@ PALABRAS_A_EVITAR = [
 
 
 def _limpiar_prompt(prompt: str) -> str:
-    """Quita frases que suelen disparar caras/manos deformes en modelos gratis."""
     prompt_limpio = prompt
     for palabra in PALABRAS_A_EVITAR:
         prompt_limpio = prompt_limpio.replace(palabra, "")
     return prompt_limpio.strip()
 
-# Prompts de prueba para validar el estilo antes de seguir construyendo
+
 PROMPTS_TEST = [
     "aircraft cockpit instrument panel at night, warning lights glowing, "
     "empty cockpit, tense atmosphere",
@@ -76,58 +69,62 @@ PROMPTS_TEST = [
     "forensic lab lighting, close up, investigation office",
 ]
 
-TIMEOUT = 25
-TIMEOUT_POLLINATIONS = 60  # 1920x1080 tarda más de 25s en generarse a menudo
-MAX_REINTENTOS = 2
-TAMANO_MINIMO_BYTES = 15_000  # por debajo de esto, la imagen casi seguro está rota/en blanco
+TIMEOUT = 30
+TAMANO_MINIMO_BYTES = 15_000
+
+_cloudflare_agotado = [False]
+_gemini_agotado = [False]
 
 
 def _validar_imagen(ruta: str) -> bool:
-    """Comprueba que el archivo existe, pesa lo suficiente y es un PNG/JPEG válido."""
     if not os.path.exists(ruta):
         return False
-    tamano = os.path.getsize(ruta)
-    if tamano < TAMANO_MINIMO_BYTES:
+    if os.path.getsize(ruta) < TAMANO_MINIMO_BYTES:
         return False
     with open(ruta, "rb") as f:
         cabecera = f.read(8)
-    es_png = cabecera.startswith(b"\x89PNG")
-    es_jpeg = cabecera.startswith(b"\xff\xd8\xff")
-    return es_png or es_jpeg
+    return cabecera.startswith(b"\x89PNG") or cabecera.startswith(b"\xff\xd8\xff")
 
 
-def _intentar_pollinations(prompt_completo: str, ruta_salida: str, semilla: int, ancho: int = 1920, alto: int = 1080) -> bool:
-    token = os.environ.get("POLLINATIONS_API_TOKEN")
+def _intentar_gemini(prompt_completo: str, ruta_salida: str) -> bool:
+    if _gemini_agotado[0]:
+        return False  # ya sabemos que se quedó sin cupo hoy
 
-    # Con token registrado, el límite de 1 petición/15-16s no aplica (o es
-    # mucho más alto) — solo frenamos en modo anónimo, sin token.
-    if not token:
-        espera_necesaria = POLLINATIONS_ESPACIADO_SEGUNDOS - (time.time() - _ultima_llamada_pollinations[0])
-        if espera_necesaria > 0:
-            time.sleep(espera_necesaria)
-        _ultima_llamada_pollinations[0] = time.time()
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        print("  [Nano Banana] falta GEMINI_API_KEY, se salta este proveedor")
+        return False
 
-    prompt_codificado = urllib.parse.quote(prompt_completo)
     url = (
-        f"https://image.pollinations.ai/prompt/{prompt_codificado}"
-        f"?width={ancho}&height={alto}&seed={semilla}&nologo=true&model=flux"
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"gemini-2.5-flash-image:generateContent?key={api_key}"
     )
-    if token:
-        url += f"&token={token}"
+    payload = {"contents": [{"parts": [{"text": prompt_completo}]}]}
     try:
-        resp = requests.get(url, timeout=TIMEOUT_POLLINATIONS)
-        if resp.status_code == 200 and len(resp.content) > TAMANO_MINIMO_BYTES:
-            with open(ruta_salida, "wb") as f:
-                f.write(resp.content)
-            return _validar_imagen(ruta_salida)
+        resp = requests.post(url, json=payload, timeout=TIMEOUT)
+        if resp.status_code == 200:
+            data = resp.json()
+            partes = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+            for parte in partes:
+                inline = parte.get("inlineData") or parte.get("inline_data")
+                if inline and inline.get("data"):
+                    with open(ruta_salida, "wb") as f:
+                        f.write(base64.b64decode(inline["data"]))
+                    return _validar_imagen(ruta_salida)
+            print(f"  [Nano Banana] respuesta sin imagen: {resp.text[:200]}")
+        elif resp.status_code == 429:
+            print(f"  [Nano Banana] límite alcanzado, se salta el resto de esta ejecución: {resp.text[:150]}")
+            _gemini_agotado[0] = True
+        else:
+            print(f"  [Nano Banana] respuesta {resp.status_code}: {resp.text[:200]}")
     except requests.RequestException as e:
-        print(f"  [Pollinations] fallo de red: {e}")
+        print(f"  [Nano Banana] fallo de red: {e}")
     return False
 
 
 def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
     if _cloudflare_agotado[0]:
-        return False  # ya sabemos que se quedó sin cupo hoy, no perdemos tiempo reintentando
+        return False
 
     account_id = os.environ.get("CF_ACCOUNT_ID")
     api_token = os.environ.get("CF_API_TOKEN")
@@ -141,8 +138,6 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
     )
     headers = {"Authorization": f"Bearer {api_token}"}
     try:
-        # Confirmado con la documentación oficial de Cloudflare: este
-        # endpoint solo acepta prompt, seed y steps — nada de width/height.
         resp = requests.post(
             url, headers=headers,
             json={"prompt": prompt_completo, "steps": 8},
@@ -150,7 +145,6 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
         )
         if resp.status_code == 200:
             data = resp.json()
-            import base64
             b64_img = data.get("result", {}).get("image")
             if b64_img:
                 with open(ruta_salida, "wb") as f:
@@ -159,37 +153,10 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
         else:
             print(f"  [Cloudflare] respuesta {resp.status_code}: {resp.text[:200]}")
             if resp.status_code == 429 and "daily free allocation" in resp.text:
-                print("  [Cloudflare] cupo diario agotado — se salta este proveedor el resto de la ejecución")
+                print("  [Cloudflare] cupo diario agotado — se salta el resto de la ejecución")
                 _cloudflare_agotado[0] = True
     except requests.RequestException as e:
         print(f"  [Cloudflare] fallo de red: {e}")
-    return False
-
-
-def _intentar_huggingface(prompt_completo: str, ruta_salida: str) -> bool:
-    api_token = os.environ.get("HF_API_TOKEN")
-    if not api_token:
-        print("  [Hugging Face] falta HF_API_TOKEN, se salta este proveedor")
-        return False
-
-    # FLUX.1-schnell fue retirado del servicio gratis de HF; usamos SDXL,
-    # que lleva más tiempo estable en su catálogo gratuito.
-    url = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0"
-    headers = {"Authorization": f"Bearer {api_token}"}
-    try:
-        resp = requests.post(
-            url, headers=headers, json={"inputs": prompt_completo}, timeout=TIMEOUT + 15
-        )
-        if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("image"):
-            with open(ruta_salida, "wb") as f:
-                f.write(resp.content)
-            return _validar_imagen(ruta_salida)
-        if resp.status_code == 503:
-            print("  [Hugging Face] modelo cargando (cold start), no da tiempo en este intento")
-        else:
-            print(f"  [Hugging Face] respuesta {resp.status_code}: {resp.text[:200]}")
-    except requests.RequestException as e:
-        print(f"  [Hugging Face] fallo de red: {e}")
     return False
 
 
@@ -228,40 +195,53 @@ def _intentar_modelslab(prompt_completo: str, ruta_salida: str) -> bool:
     return False
 
 
+def _intentar_huggingface(prompt_completo: str, ruta_salida: str) -> bool:
+    api_token = os.environ.get("HF_API_TOKEN")
+    if not api_token:
+        print("  [Hugging Face] falta HF_API_TOKEN, se salta este proveedor")
+        return False
+
+    url = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0"
+    headers = {"Authorization": f"Bearer {api_token}"}
+    try:
+        resp = requests.post(
+            url, headers=headers, json={"inputs": prompt_completo}, timeout=TIMEOUT + 15
+        )
+        if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("image"):
+            with open(ruta_salida, "wb") as f:
+                f.write(resp.content)
+            return _validar_imagen(ruta_salida)
+        if resp.status_code == 503:
+            print("  [Hugging Face] modelo cargando (cold start), no da tiempo en este intento")
+        else:
+            print(f"  [Hugging Face] respuesta {resp.status_code}: {resp.text[:200]}")
+    except requests.RequestException as e:
+        print(f"  [Hugging Face] fallo de red: {e}")
+    return False
+
+
 def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) -> bool:
     """
-    Genera una imagen para una escena, con reintentos y fallback de proveedor.
-    Devuelve True si consiguió una imagen válida, False si fallaron todos los intentos.
+    Genera una imagen para una escena, con fallback en cascada:
+    Nano Banana → Cloudflare → ModelsLab → Hugging Face.
     """
-    if semilla is None:
-        semilla = int(time.time()) % 100000
-
     prompt_completo = f"{ESTILO_BASE}, {_limpiar_prompt(prompt_escena)}"
 
-    # --- Proveedor 1: Pollinations. Intento 1 a resolución completa;
-    # intento 2 a resolución reducida (degradación gradual: si la imagen
-    # grande tarda demasiado, una más pequeña tiene más margen de éxito) ---
-    resoluciones = [(1920, 1080), (1280, 720)]
-    for intento, (ancho, alto) in enumerate(resoluciones, start=1):
-        print(f"  Intento {intento}/{len(resoluciones)} con Pollinations ({ancho}x{alto})...")
-        if _intentar_pollinations(prompt_completo, ruta_salida, semilla + intento, ancho, alto):
-            print("  ✓ Imagen válida generada con Pollinations")
-            return True
-        time.sleep(2)
+    print("  Intentando con Nano Banana (Gemini)...")
+    if _intentar_gemini(prompt_completo, ruta_salida):
+        print("  ✓ Imagen válida generada con Nano Banana")
+        return True
 
-    # --- Proveedor 2 (fallback): Cloudflare Workers AI ---
-    print("  Pollinations falló, probando Cloudflare Workers AI...")
+    print("  Nano Banana falló, probando Cloudflare Workers AI...")
     if _intentar_cloudflare(prompt_completo, ruta_salida):
         print("  ✓ Imagen válida generada con Cloudflare")
         return True
 
-    # --- Proveedor 3 (fallback): ModelsLab (100 imágenes/día gratis) ---
     print("  Cloudflare también falló, probando ModelsLab...")
     if _intentar_modelslab(prompt_completo, ruta_salida):
         print("  ✓ Imagen válida generada con ModelsLab")
         return True
 
-    # --- Proveedor 4 (última red de seguridad): Hugging Face ---
     print("  ModelsLab también falló, probando Hugging Face...")
     if _intentar_huggingface(prompt_completo, ruta_salida):
         print("  ✓ Imagen válida generada con Hugging Face")
@@ -272,7 +252,6 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) ->
 
 
 def modo_test():
-    """Genera las 4 imágenes de prueba del estilo del canal."""
     carpeta = "test_estilo"
     os.makedirs(carpeta, exist_ok=True)
     resultados = []
