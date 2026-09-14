@@ -31,9 +31,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: proyecto
-          key: ultima-senal-${{ inputs.titulo }}-${{ github.run_id }}
+          # PIPELINE_VERSION: súbela cada vez que cambiemos algo que afecte
+          # a la calidad de las imágenes/estilo (proveedor, prompts, etc.)
+          # para que la caché vieja se invalide sola y no se reutilicen
+          # imágenes generadas con una versión anterior peor del pipeline.
+          key: ultima-senal-v2-${{ inputs.titulo }}-${{ github.run_id }}
           restore-keys: |
-            ultima-senal-${{ inputs.titulo }}-
+            ultima-senal-v2-${{ inputs.titulo }}-
 
       - name: Ejecutar pipeline completo
         env:
@@ -43,6 +47,7 @@ jobs:
           HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
           MODELSLAB_API_KEY: ${{ secrets.MODELSLAB_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
         run: python pipeline_auto.py "${{ inputs.titulo }}"
 
       - name: Subir vídeo final
@@ -52,6 +57,7 @@ jobs:
           name: video-${{ github.run_id }}
           path: |
             proyecto/video_final.mp4
+            proyecto/metadata_youtube.txt
             proyecto/guion.json
             proyecto/imagenes/
           retention-days: 21
