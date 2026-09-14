@@ -73,7 +73,7 @@ TIMEOUT = 30
 TAMANO_MINIMO_BYTES = 15_000
 
 _cloudflare_agotado = [False]
-_gemini_agotado = [False]
+_gemini_claves_agotadas = set()
 
 # Margen prudente entre peticiones a Nano Banana para no toparnos con su
 # límite de peticiones/minuto del plan gratis (más generoso que el de
@@ -93,13 +93,24 @@ def _validar_imagen(ruta: str) -> bool:
     return cabecera.startswith(b"\x89PNG") or cabecera.startswith(b"\xff\xd8\xff")
 
 
-def _intentar_gemini(prompt_completo: str, ruta_salida: str) -> bool:
-    if _gemini_agotado[0]:
-        return False  # ya sabemos que se quedó sin cupo hoy
+def _claves_gemini_disponibles() -> list:
+    """Lee todas las claves de Google configuradas (GEMINI_API_KEY,
+    GEMINI_API_KEY_2, GEMINI_API_KEY_3...) que aún no se hayan agotado hoy."""
+    claves = []
+    for nombre in ("GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3"):
+        valor = os.environ.get(nombre)
+        if valor:
+            claves.append((nombre, valor))
+    return [c for c in claves if c[0] not in _gemini_claves_agotadas]
 
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        print("  [Nano Banana] falta GEMINI_API_KEY, se salta este proveedor")
+
+def _intentar_gemini(prompt_completo: str, ruta_salida: str) -> bool:
+    claves = _claves_gemini_disponibles()
+    if not claves:
+        if not any(os.environ.get(n) for n in ("GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3")):
+            print("  [Nano Banana] falta GEMINI_API_KEY, se salta este proveedor")
+        else:
+            print("  [Nano Banana] todas las claves configuradas se agotaron hoy, se salta este proveedor")
         return False
 
     espera_necesaria = GEMINI_ESPACIADO_SEGUNDOS - (time.time() - _ultima_llamada_gemini[0])
@@ -107,39 +118,40 @@ def _intentar_gemini(prompt_completo: str, ruta_salida: str) -> bool:
         time.sleep(espera_necesaria)
     _ultima_llamada_gemini[0] = time.time()
 
-    headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
     payload = {"contents": [{"parts": [{"text": prompt_completo}]}]}
-
-    # gemini-2.5-flash-image (el "legacy") está siendo retirado por Google
-    # (cierre el 2 de octubre de 2026) y ya da 404 de forma intermitente.
-    # Usamos el modelo vigente — Nano Banana 2 Lite — como principal, con
-    # Nano Banana 2 normal como segundo intento dentro del propio Gemini.
     modelos = ["gemini-3.1-flash-lite-image", "gemini-3.1-flash-image"]
-    for modelo in modelos:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
-        try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=TIMEOUT)
-            if resp.status_code == 200:
-                data = resp.json()
-                partes = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-                for parte in partes:
-                    inline = parte.get("inlineData") or parte.get("inline_data")
-                    if inline and inline.get("data"):
-                        with open(ruta_salida, "wb") as f:
-                            f.write(base64.b64decode(inline["data"]))
-                        return _validar_imagen(ruta_salida)
-                print(f"  [Nano Banana/{modelo}] respuesta sin imagen: {resp.text[:200]}")
-            elif resp.status_code == 429:
-                print(f"  [Nano Banana/{modelo}] límite alcanzado: {resp.text[:150]}")
-                _gemini_agotado[0] = True
-                return False
-            elif resp.status_code == 404:
-                print(f"  [Nano Banana/{modelo}] modelo no encontrado (404), probando el siguiente...")
-                continue
-            else:
-                print(f"  [Nano Banana/{modelo}] respuesta {resp.status_code}: {resp.text[:200]}")
-        except requests.RequestException as e:
-            print(f"  [Nano Banana/{modelo}] fallo de red: {e}")
+
+    # Rotamos entre todas las claves disponibles: si una se agota a mitad
+    # de la ejecución, las siguientes imágenes usan automáticamente la
+    # otra clave en vez de caer directamente a Cloudflare.
+    for nombre_clave, api_key in claves:
+        headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
+        for modelo in modelos:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
+            try:
+                resp = requests.post(url, headers=headers, json=payload, timeout=TIMEOUT)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    partes = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                    for parte in partes:
+                        inline = parte.get("inlineData") or parte.get("inline_data")
+                        if inline and inline.get("data"):
+                            with open(ruta_salida, "wb") as f:
+                                f.write(base64.b64decode(inline["data"]))
+                            return _validar_imagen(ruta_salida)
+                    print(f"  [Nano Banana/{nombre_clave}/{modelo}] respuesta sin imagen: {resp.text[:200]}")
+                elif resp.status_code == 429:
+                    print(f"  [Nano Banana/{nombre_clave}] límite alcanzado, "
+                          f"pasando a la siguiente clave si hay: {resp.text[:120]}")
+                    _gemini_claves_agotadas.add(nombre_clave)
+                    break  # probar la siguiente clave, no el otro modelo de esta misma
+                elif resp.status_code == 404:
+                    print(f"  [Nano Banana/{nombre_clave}/{modelo}] modelo no encontrado (404), probando el siguiente...")
+                    continue
+                else:
+                    print(f"  [Nano Banana/{nombre_clave}/{modelo}] respuesta {resp.status_code}: {resp.text[:200]}")
+            except requests.RequestException as e:
+                print(f"  [Nano Banana/{nombre_clave}/{modelo}] fallo de red: {e}")
     return False
 
 
