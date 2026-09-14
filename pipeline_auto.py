@@ -79,6 +79,18 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
     info_escenas_path = os.path.join(carpeta_audio, "info_escenas.json")
     montar_video_final(carpeta_clips, carpeta_audio, ruta_final, info_escenas_path)
 
+    # Archivo con todo lo necesario para subir el vídeo a YouTube sin
+    # tener que escribir nada a mano: título, descripción y tags.
+    ruta_metadata = os.path.join(carpeta_proyecto, "metadata_youtube.txt")
+    with open(ruta_metadata, "w", encoding="utf-8") as f:
+        f.write("=== TÍTULO ===\n")
+        f.write(guion.get("titulo_video", "") + "\n\n")
+        f.write("=== DESCRIPCIÓN ===\n")
+        f.write(guion.get("descripcion_youtube", "") + "\n\n")
+        f.write("=== TAGS (separados por coma) ===\n")
+        f.write(", ".join(guion.get("tags_youtube", [])) + "\n")
+    print(f"✓ Metadata de YouTube guardada en {ruta_metadata}")
+
     print(f"\n✓✓✓ COMPLETO: {ruta_final}")
     return ruta_final
 
