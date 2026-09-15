@@ -57,6 +57,7 @@ jobs:
           name: video-${{ github.run_id }}
           path: |
             proyecto/video_final.mp4
+            proyecto/miniatura.png
             proyecto/metadata_youtube.txt
             proyecto/guion.json
             proyecto/imagenes/
