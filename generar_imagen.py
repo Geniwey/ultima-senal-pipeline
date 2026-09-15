@@ -1,13 +1,15 @@
 """
 Última Señal — Generador de imágenes con fallback automático (4 proveedores)
 ================================================================================
-Intento 1: Nano Banana / Gemini 2.5 Flash Image (Google) - gratis, 500/día,
-           la mejor calidad de las opciones gratuitas disponibles.
-           AVISO LEGAL: las condiciones de la API gratuita de Gemini prohíben
-           servir a usuarios de la UE/EEE. Se usa aquí bajo tu propio criterio
-           para un proyecto personal de bajo volumen — ver conversación.
-Intento 2: Cloudflare Workers AI - Flux Schnell (gratis, cuota diaria)
-Intento 3: ModelsLab (gratis, 100 imágenes/día)
+Orden de proveedores (Cloudflare primero: es el que de verdad aguanta un
+vídeo entero sin fallar; el cupo gratis de imágenes de Gemini se ha
+recortado mucho en 2026 y no da ni para un tercio de un vídeo):
+Intento 1: Cloudflare Workers AI - Flux Schnell (gratis, cuota diaria)
+Intento 2: ModelsLab (gratis, 100 imágenes/día)
+Intento 3: Nano Banana / Gemini (bonus si funciona — cupo gratis muy bajo
+           ahora mismo, y con un bug conocido de Google que a veces lo deja
+           en 0. Se deja como intento por si en algún momento funciona,
+           pero no se cuenta con él.)
 Intento 4: Hugging Face (última red de seguridad, modelo variable)
 
 Uso:
@@ -15,11 +17,11 @@ Uso:
     python generar_imagen.py --test   # genera 4 imágenes de prueba con el estilo del canal
 
 Configuración necesaria (variables de entorno):
-    GEMINI_API_KEY   -> clave gratis de aistudio.google.com (Nano Banana)
-    CF_ACCOUNT_ID    -> ID de cuenta de Cloudflare
-    CF_API_TOKEN     -> Token de API de Cloudflare Workers AI
-    MODELSLAB_API_KEY-> clave gratis de modelslab.com
-    HF_API_TOKEN     -> Token de Hugging Face (opcional, último recurso)
+    CF_ACCOUNT_ID     -> ID de cuenta de Cloudflare
+    CF_API_TOKEN      -> Token de API de Cloudflare Workers AI
+    MODELSLAB_API_KEY -> clave gratis de modelslab.com
+    GEMINI_API_KEY, GEMINI_API_KEY_2 -> claves gratis de aistudio.google.com (opcionales)
+    HF_API_TOKEN      -> Token de Hugging Face (opcional, último recurso)
 """
 
 import os
@@ -32,16 +34,18 @@ import requests
 # ESTILO VISUAL DEL CANAL
 # ---------------------------------------------------------------------------
 ESTILO_BASE = (
-    "flat vector infographic illustration, bold flat colors, minimalist "
-    "flat design, simple geometric icons, clean modern explainer-video "
-    "style, high contrast, thick outlines, simple stick-figure or "
-    "flat-icon characters when a person is needed, no photorealism, "
-    "no gradients clutter, no text, no watermark, no logos, "
-    "no detailed faces, no detailed hands, single clear focal subject "
-    "centered in frame, clearly recognizable everyday object or icon, "
-    "simple and literal illustration of the concept, not abstract art, "
-    "no abstract shapes, no non-representational geometric composition, "
-    "plain solid background"
+    "flat vector infographic illustration, minimalist flat design, "
+    "simple geometric icons, clean modern explainer-video style, "
+    "thick outlines, simple stick-figure or flat-icon characters when a "
+    "person is needed, no photorealism, no gradients clutter, no text, "
+    "no watermark, no logos, no detailed faces, no detailed hands, "
+    "single clear focal subject centered in frame, clearly recognizable "
+    "everyday object or icon, simple and literal illustration of the "
+    "concept, not abstract art, no abstract shapes, no non-representational "
+    "geometric composition, plain solid background, "
+    "STRICT BRAND COLOR PALETTE ONLY: deep navy blue (#1B2A4A), burnt "
+    "orange (#C1502E), off-white (#E8E6DE), charcoal black (#2B2B2B) — "
+    "use only these four colors plus their light/dark shades, no other hues"
 )
 
 PALABRAS_A_EVITAR = [
@@ -165,14 +169,57 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
         print("  [Cloudflare] faltan CF_ACCOUNT_ID / CF_API_TOKEN, se salta este proveedor")
         return False
 
-    url = (
+    headers = {"Authorization": f"Bearer {api_token}"}
+
+    # --- Intento A: FLUX.2 [klein] 9B — modelo nuevo, mejor calidad según
+    # la propia Cloudflare. Usa multipart/form-data, no JSON. ---
+    url_klein = (
+        f"https://api.cloudflare.com/client/v4/accounts/{account_id}"
+        f"/ai/run/@cf/black-forest-labs/flux-2-klein-9b"
+    )
+    try:
+        resp = requests.post(
+            url_klein, headers=headers,
+            data={"prompt": prompt_completo, "width": "1024", "height": "576"},
+            timeout=TIMEOUT,
+        )
+        if resp.status_code == 200:
+            content_type = resp.headers.get("content-type", "")
+            if content_type.startswith("image"):
+                with open(ruta_salida, "wb") as f:
+                    f.write(resp.content)
+                if _validar_imagen(ruta_salida):
+                    return True
+            else:
+                data = resp.json()
+                b64_img = data.get("result", {}).get("image")
+                if b64_img:
+                    with open(ruta_salida, "wb") as f:
+                        f.write(base64.b64decode(b64_img))
+                    if _validar_imagen(ruta_salida):
+                        return True
+        else:
+            print(f"  [Cloudflare/flux-2-klein] respuesta {resp.status_code}: {resp.text[:200]}")
+            if resp.status_code == 429 and "daily free allocation" in resp.text:
+                print("  [Cloudflare] cupo diario agotado — se salta el resto de la ejecución")
+                _cloudflare_agotado[0] = True
+                return False
+    except requests.RequestException as e:
+        print(f"  [Cloudflare/flux-2-klein] fallo de red: {e}")
+
+    if _cloudflare_agotado[0]:
+        return False
+
+    # --- Intento B (respaldo dentro de Cloudflare): flux-1-schnell, el
+    # modelo anterior, por si klein fallara por algún motivo puntual ---
+    print("  [Cloudflare] flux-2-klein falló, probando flux-1-schnell...")
+    url_schnell = (
         f"https://api.cloudflare.com/client/v4/accounts/{account_id}"
         f"/ai/run/@cf/black-forest-labs/flux-1-schnell"
     )
-    headers = {"Authorization": f"Bearer {api_token}"}
     try:
         resp = requests.post(
-            url, headers=headers,
+            url_schnell, headers=headers,
             json={"prompt": prompt_completo, "steps": 8},
             timeout=TIMEOUT,
         )
@@ -184,7 +231,7 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
                     f.write(base64.b64decode(b64_img))
                 return _validar_imagen(ruta_salida)
         else:
-            print(f"  [Cloudflare] respuesta {resp.status_code}: {resp.text[:200]}")
+            print(f"  [Cloudflare/flux-1-schnell] respuesta {resp.status_code}: {resp.text[:200]}")
             if resp.status_code == 429 and "daily free allocation" in resp.text:
                 print("  [Cloudflare] cupo diario agotado — se salta el resto de la ejecución")
                 _cloudflare_agotado[0] = True
@@ -256,26 +303,27 @@ def _intentar_huggingface(prompt_completo: str, ruta_salida: str) -> bool:
 def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) -> bool:
     """
     Genera una imagen para una escena, con fallback en cascada:
-    Nano Banana → Cloudflare → ModelsLab → Hugging Face.
+    Cloudflare (principal, el que de verdad aguanta el vídeo entero) →
+    ModelsLab → Nano Banana (bonus si funciona) → Hugging Face (último recurso).
     """
     prompt_completo = f"{ESTILO_BASE}, {_limpiar_prompt(prompt_escena)}"
 
-    print("  Intentando con Nano Banana (Gemini)...")
-    if _intentar_gemini(prompt_completo, ruta_salida):
-        print("  ✓ Imagen válida generada con Nano Banana")
-        return True
-
-    print("  Nano Banana falló, probando Cloudflare Workers AI...")
+    print("  Intentando con Cloudflare Workers AI...")
     if _intentar_cloudflare(prompt_completo, ruta_salida):
         print("  ✓ Imagen válida generada con Cloudflare")
         return True
 
-    print("  Cloudflare también falló, probando ModelsLab...")
+    print("  Cloudflare falló, probando ModelsLab...")
     if _intentar_modelslab(prompt_completo, ruta_salida):
         print("  ✓ Imagen válida generada con ModelsLab")
         return True
 
-    print("  ModelsLab también falló, probando Hugging Face...")
+    print("  ModelsLab también falló, probando Nano Banana (Gemini)...")
+    if _intentar_gemini(prompt_completo, ruta_salida):
+        print("  ✓ Imagen válida generada con Nano Banana")
+        return True
+
+    print("  Nano Banana también falló, probando Hugging Face...")
     if _intentar_huggingface(prompt_completo, ruta_salida):
         print("  ✓ Imagen válida generada con Hugging Face")
         return True
