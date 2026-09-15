@@ -19,6 +19,7 @@ from generar_imagen import generar_imagen
 from generar_voz import generar_voces
 from animar_imagen import animar_todas
 from montar_video import montar_video_final
+from generar_miniatura import generar_miniatura
 
 
 def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
@@ -80,16 +81,49 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
     montar_video_final(carpeta_clips, carpeta_audio, ruta_final, info_escenas_path)
 
     # Archivo con todo lo necesario para subir el vídeo a YouTube sin
-    # tener que escribir nada a mano: título, descripción y tags.
+    # tener que escribir nada a mano: título, descripción, tags y capítulos.
     ruta_metadata = os.path.join(carpeta_proyecto, "metadata_youtube.txt")
+
+    # Capítulos automáticos: repartimos ~7 puntos a lo largo del guion,
+    # usando el titular en pantalla de esa escena y su tiempo acumulado
+    # (empezando en 0:00 con el intro de 3s ya sumado).
+    capitulos = []
+    tiempo_acumulado = 3.0  # el bumper de intro dura 3s
+    total_escenas = len(info_escenas)
+    paso = max(total_escenas // 7, 1)
+    for i, escena in enumerate(info_escenas):
+        if i == 0 or i % paso == 0:
+            minutos = int(tiempo_acumulado // 60)
+            segundos = int(tiempo_acumulado % 60)
+            titulo_cap = escena.get("texto_pantalla") or f"Parte {len(capitulos)+1}"
+            capitulos.append(f"{minutos}:{segundos:02d} {titulo_cap.title()}")
+        tiempo_acumulado += escena["duracion_segundos"]
+
     with open(ruta_metadata, "w", encoding="utf-8") as f:
         f.write("=== TÍTULO ===\n")
         f.write(guion.get("titulo_video", "") + "\n\n")
         f.write("=== DESCRIPCIÓN ===\n")
         f.write(guion.get("descripcion_youtube", "") + "\n\n")
+        f.write("=== CAPÍTULOS (pega esto dentro de la descripción) ===\n")
+        f.write("\n".join(capitulos) + "\n\n")
         f.write("=== TAGS (separados por coma) ===\n")
         f.write(", ".join(guion.get("tags_youtube", [])) + "\n")
     print(f"✓ Metadata de YouTube guardada en {ruta_metadata}")
+
+    # Miniatura: usamos el prompt de imagen de la escena más "álgida" del
+    # vídeo (aprox. dos tercios del guion, donde suele estar el giro fuerte)
+    print("\nGenerando miniatura...")
+    escena_miniatura = info_escenas[int(len(info_escenas) * 0.65)]
+    ruta_miniatura = os.path.join(carpeta_proyecto, "miniatura.png")
+    try:
+        generar_miniatura(
+            escena_miniatura["prompt_imagen"],
+            guion.get("titulo_video", "")[:40],
+            ruta_miniatura,
+        )
+        print(f"✓ Miniatura guardada en {ruta_miniatura}")
+    except Exception as e:
+        print(f"  ⚠ No se pudo generar la miniatura automáticamente: {e}")
 
     print(f"\n✓✓✓ COMPLETO: {ruta_final}")
     return ruta_final
