@@ -300,11 +300,41 @@ def _intentar_huggingface(prompt_completo: str, ruta_salida: str) -> bool:
     return False
 
 
+def _intentar_gradio(prompt_completo: str, ruta_salida: str) -> bool:
+    # Hugging Face Spaces públicos con Gradio (demos gratis, sin API key).
+    # AVISO: menos fiable que Cloudflare/ModelsLab — dependen de que el
+    # Space esté encendido y sin cola en ese momento. Es una capa extra
+    # de reserva, no algo con lo que contar como principal.
+    try:
+        from gradio_client import Client
+    except ImportError:
+        print("  [Gradio] falta la librería gradio_client, se salta este proveedor")
+        return False
+
+    espacios_publicos = [
+        "black-forest-labs/FLUX.1-schnell",
+        "stabilityai/stable-diffusion-3.5-large-turbo",
+    ]
+    for espacio in espacios_publicos:
+        try:
+            cliente = Client(espacio, download_files=True)
+            resultado = cliente.predict(prompt_completo, api_name="/infer")
+            ruta_resultado = resultado[0] if isinstance(resultado, (list, tuple)) else resultado
+            if isinstance(ruta_resultado, str) and os.path.exists(ruta_resultado):
+                import shutil
+                shutil.copy(ruta_resultado, ruta_salida)
+                if _validar_imagen(ruta_salida):
+                    return True
+        except Exception as e:
+            print(f"  [Gradio/{espacio}] fallo: {str(e)[:150]}")
+    return False
+
+
 def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) -> bool:
     """
     Genera una imagen para una escena, con fallback en cascada:
-    Cloudflare (principal, el que de verdad aguanta el vídeo entero) →
-    ModelsLab → Nano Banana (bonus si funciona) → Hugging Face (último recurso).
+    Cloudflare (principal) → ModelsLab → Nano Banana (bonus) →
+    Gradio/HF Spaces (bonus) → Hugging Face directo (último recurso).
     """
     prompt_completo = f"{ESTILO_BASE}, {_limpiar_prompt(prompt_escena)}"
 
@@ -323,12 +353,17 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) ->
         print("  ✓ Imagen válida generada con Nano Banana")
         return True
 
-    print("  Nano Banana también falló, probando Hugging Face...")
+    print("  Nano Banana también falló, probando Gradio (HF Spaces públicos)...")
+    if _intentar_gradio(prompt_completo, ruta_salida):
+        print("  ✓ Imagen válida generada con Gradio")
+        return True
+
+    print("  Gradio también falló, probando Hugging Face directo...")
     if _intentar_huggingface(prompt_completo, ruta_salida):
         print("  ✓ Imagen válida generada con Hugging Face")
         return True
 
-    print(f"  ✗ FALLO TOTAL (4 proveedores agotados) generando imagen para: {prompt_escena[:60]}...")
+    print(f"  ✗ FALLO TOTAL (5 proveedores agotados) generando imagen para: {prompt_escena[:60]}...")
     return False
 
 
