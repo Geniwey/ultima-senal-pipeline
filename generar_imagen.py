@@ -34,15 +34,20 @@ import requests
 # ESTILO VISUAL DEL CANAL
 # ---------------------------------------------------------------------------
 ESTILO_BASE = (
-    "flat vector infographic illustration, minimalist flat design, "
-    "simple geometric icons, clean modern explainer-video style, "
-    "thick outlines, simple stick-figure or flat-icon characters when a "
-    "person is needed, no photorealism, no gradients clutter, no text, "
-    "no watermark, no logos, no detailed faces, no detailed hands, "
-    "single clear focal subject centered in frame, clearly recognizable "
-    "everyday object or icon, simple and literal illustration of the "
-    "concept, not abstract art, no abstract shapes, no non-representational "
-    "geometric composition, plain solid background, "
+    "single simple flat vector icon illustration, one isolated pictogram, "
+    "minimalist modern icon design, bold flat colors, thick clean outlines, "
+    "simple stick-figure or flat-icon character only if a person is needed, "
+    "no photorealism, no gradients, plain solid background, "
+    "ABSOLUTE RULES: only ONE icon or object per image, nothing else in "
+    "frame, no multiple elements, no dashboard layout, no diagram with "
+    "connected nodes, no checklist, no chart, no report document mockup, "
+    "no PowerPoint style, no business presentation template, no corporate "
+    "slide design, no infographic layout with multiple panels, "
+    "absolutely no text, no letters, no words, no numbers, no labels, no "
+    "gibberish writing anywhere in the image, no watermark, no logos, "
+    "no detailed faces, no detailed hands, "
+    "clearly recognizable everyday object, simple and literal illustration "
+    "of the concept, not abstract art, no abstract shapes, "
     "STRICT BRAND COLOR PALETTE ONLY: deep navy blue (#1B2A4A), burnt "
     "orange (#C1502E), off-white (#E8E6DE), charcoal black (#2B2B2B) — "
     "use only these four colors plus their light/dark shades, no other hues"
@@ -311,14 +316,17 @@ def _intentar_gradio(prompt_completo: str, ruta_salida: str) -> bool:
         print("  [Gradio] falta la librería gradio_client, se salta este proveedor")
         return False
 
+    # Cada Space público tiene su propia firma de argumentos — la
+    # llamada "genérica" (solo el prompt) no vale para todos.
     espacios_publicos = [
-        "black-forest-labs/FLUX.1-schnell",
-        "stabilityai/stable-diffusion-3.5-large-turbo",
+        {"nombre": "black-forest-labs/FLUX.1-schnell", "kwargs": {"prompt": prompt_completo}},
+        {"nombre": "stabilityai/stable-diffusion-3.5-large-turbo",
+         "kwargs": {"prompt": prompt_completo, "negative_prompt": "", "seed": 0, "randomize_seed": True}},
     ]
     for espacio in espacios_publicos:
         try:
-            cliente = Client(espacio, download_files=True)
-            resultado = cliente.predict(prompt_completo, api_name="/infer")
+            cliente = Client(espacio["nombre"], download_files=True)
+            resultado = cliente.predict(**espacio["kwargs"], api_name="/infer")
             ruta_resultado = resultado[0] if isinstance(resultado, (list, tuple)) else resultado
             if isinstance(ruta_resultado, str) and os.path.exists(ruta_resultado):
                 import shutil
@@ -326,7 +334,7 @@ def _intentar_gradio(prompt_completo: str, ruta_salida: str) -> bool:
                 if _validar_imagen(ruta_salida):
                     return True
         except Exception as e:
-            print(f"  [Gradio/{espacio}] fallo: {str(e)[:150]}")
+            print(f"  [Gradio/{espacio['nombre']}] fallo: {str(e)[:150]}")
     return False
 
 
