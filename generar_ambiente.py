@@ -45,3 +45,23 @@ def mezclar_con_narracion(ruta_narracion: str, ruta_ambiente: str, ruta_salida: 
     if resultado.returncode != 0 or not os.path.exists(ruta_salida):
         raise RuntimeError(f"Fallo mezclando ambiente + narración:\n{resultado.stderr[-600:]}")
     return ruta_salida
+
+
+def generar_alarma_intro(ruta_salida: str, duracion_segundos: float = 3.0):
+    """Pitidos de alarma sintetizados para los primeros segundos del vídeo
+    (durante el bumper de intro, antes de que arranque la narración) —
+    refuerza el gancho inicial en vez de empezar en silencio."""
+    filtro = (
+        f"sine=frequency=1000:duration={duracion_segundos},"
+        f"apulsator=hz=2.2,"
+        f"volume=0.35,"
+        f"afade=t=out:st={max(duracion_segundos-0.3,0)}:d=0.3"
+    )
+    comando = [
+        "ffmpeg", "-y", "-f", "lavfi", "-i", filtro,
+        "-ac", "2", ruta_salida,
+    ]
+    resultado = subprocess.run(comando, capture_output=True, text=True)
+    if resultado.returncode != 0 or not os.path.exists(ruta_salida):
+        raise RuntimeError(f"Fallo generando la alarma del intro:\n{resultado.stderr[-600:]}")
+    return ruta_salida
