@@ -19,7 +19,7 @@ from generar_imagen import generar_imagen
 from generar_voz import generar_voces
 from animar_imagen import animar_todas
 from montar_video import montar_video_final
-from generar_miniatura import generar_miniatura
+from generar_miniatura import generar_miniatura_desde_imagen
 
 
 def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
@@ -110,20 +110,23 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
         f.write(", ".join(guion.get("tags_youtube", [])) + "\n")
     print(f"✓ Metadata de YouTube guardada en {ruta_metadata}")
 
-    # Miniatura: usamos el prompt de imagen de la escena más "álgida" del
-    # vídeo (aprox. dos tercios del guion, donde suele estar el giro fuerte)
-    print("\nGenerando miniatura...")
-    escena_miniatura = info_escenas[int(len(info_escenas) * 0.65)]
+    # Miniatura: reutilizamos una imagen que YA generamos bien para el
+    # vídeo (aprox. dos tercios del guion) en vez de pedir una nueva — así
+    # no depende de que quede cupo libre justo al final, cuando ya hemos
+    # gastado el de las 90-100 imágenes del vídeo.
+    print("\nGenerando miniatura (a partir de una imagen ya generada)...")
+    indice_miniatura = info_escenas[int(len(info_escenas) * 0.65)]["indice"]
+    ruta_imagen_base = os.path.join(carpeta_imagenes, f"escena_{indice_miniatura:02d}.png")
     ruta_miniatura = os.path.join(carpeta_proyecto, "miniatura.png")
     try:
-        generar_miniatura(
-            escena_miniatura["prompt_imagen"],
+        generar_miniatura_desde_imagen(
+            ruta_imagen_base,
             guion.get("titulo_video", "")[:40],
             ruta_miniatura,
         )
         print(f"✓ Miniatura guardada en {ruta_miniatura}")
     except Exception as e:
-        print(f"  ⚠ No se pudo generar la miniatura automáticamente: {e}")
+        print(f"  ⚠ No se pudo generar la miniatura: {e}")
 
     print(f"\n✓✓✓ COMPLETO: {ruta_final}")
     return ruta_final
