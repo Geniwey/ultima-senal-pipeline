@@ -11,6 +11,7 @@ import subprocess
 import os
 
 COLOR_BORDE = "0x1B2A4A"
+COLOR_ACENTO = "0xC1502E"
 
 
 def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, ruta_salida: str):
@@ -21,11 +22,19 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
         titulo_corto.upper()
         .replace("\\", "").replace(":", "").replace("'", "").replace('"', "")
     )
+    # Varias cajas semitransparentes apiladas simulan un degradado hacia
+    # abajo (fiable en cualquier FFmpeg, sin filtros complejos que puedan
+    # fallar), barra de acento de marca, y texto grande con contorno fuerte.
     filtro = (
         "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,"
-        f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize=88:"
-        f"font='DejaVu Sans Bold':borderw=6:bordercolor={COLOR_BORDE}@1.0:"
-        "x=(w-text_w)/2:y=h-220"
+        "drawbox=x=0:y=500:w=1280:h=55:color=black@0.15:t=fill,"
+        "drawbox=x=0:y=555:w=1280:h=55:color=black@0.30:t=fill,"
+        "drawbox=x=0:y=610:w=1280:h=55:color=black@0.50:t=fill,"
+        "drawbox=x=0:y=665:w=1280:h=55:color=black@0.68:t=fill,"
+        f"drawbox=x=0:y=690:w=1280:h=8:color={COLOR_ACENTO}@1.0:t=fill,"
+        f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize=104:"
+        f"font='DejaVu Sans Bold':borderw=8:bordercolor=black@1.0:"
+        "x=(w-text_w)/2:y=h-235"
     )
     comando = [
         "ffmpeg", "-y", "-i", ruta_imagen_base,
