@@ -1,31 +1,21 @@
 """
 Última Señal — Miniatura (thumbnail)
 =======================================
-Genera una imagen de portada llamativa en el formato estándar de
-YouTube (1280x720), reutilizando el mismo proveedor de imágenes del
-canal y quemando el titular en grande encima, en los colores de marca.
+Genera la imagen de portada en formato estándar de YouTube (1280x720) a
+partir de una imagen del vídeo QUE YA SE GENERÓ BIEN — no pide una imagen
+nueva a ningún proveedor, así nunca depende de que quede cupo libre justo
+al final de la ejecución.
 """
 
 import subprocess
 import os
 
-from generar_imagen import generar_imagen, ESTILO_BASE
-
-COLOR_TITULO = "0xC1502E"
 COLOR_BORDE = "0x1B2A4A"
 
 
-def generar_miniatura(prompt_visual: str, titulo_corto: str, ruta_salida: str):
-    """
-    prompt_visual: descripción en inglés de la imagen de fondo (el momento
-                   más impactante/representativo del vídeo).
-    titulo_corto: texto corto (3-6 palabras) para quemar en grande, en
-                  MAYÚSCULAS, sobre la imagen.
-    """
-    ruta_fondo = ruta_salida + "_fondo_temp.png"
-    ok = generar_imagen(prompt_visual, ruta_fondo)
-    if not ok:
-        raise RuntimeError("No se pudo generar la imagen base de la miniatura")
+def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, ruta_salida: str):
+    if not os.path.exists(ruta_imagen_base):
+        raise RuntimeError(f"No existe la imagen base para la miniatura: {ruta_imagen_base}")
 
     texto_seguro = (
         titulo_corto.upper()
@@ -38,12 +28,11 @@ def generar_miniatura(prompt_visual: str, titulo_corto: str, ruta_salida: str):
         "x=(w-text_w)/2:y=h-220"
     )
     comando = [
-        "ffmpeg", "-y", "-i", ruta_fondo,
+        "ffmpeg", "-y", "-i", ruta_imagen_base,
         "-vf", filtro, "-frames:v", "1",
         ruta_salida,
     ]
     resultado = subprocess.run(comando, capture_output=True, text=True)
-    os.remove(ruta_fondo)
     if resultado.returncode != 0 or not os.path.exists(ruta_salida):
         raise RuntimeError(f"Fallo generando la miniatura:\n{resultado.stderr[-600:]}")
     return ruta_salida
