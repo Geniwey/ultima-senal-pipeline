@@ -23,6 +23,10 @@ VARIANTES = [
 ]
 
 
+COLOR_BARRA = "0x1B2A4A"   # navy de marca
+COLOR_ACENTO = "0xC1502E"  # naranja de marca
+
+
 def animar_imagen(ruta_imagen: str, duracion_segundos: float, ruta_salida: str,
                    indice_variante: int, texto_pantalla: str = None):
     if os.path.exists(ruta_salida) and os.path.getsize(ruta_salida) > 10_000:
@@ -46,7 +50,6 @@ def animar_imagen(ruta_imagen: str, duracion_segundos: float, ruta_salida: str,
     filtros = [filtro_zoompan]
 
     if texto_pantalla:
-        # Escapamos caracteres problemáticos para el filtro drawtext de FFmpeg
         texto_seguro = (
             texto_pantalla.upper()
             .replace("\\", "")
@@ -54,11 +57,16 @@ def animar_imagen(ruta_imagen: str, duracion_segundos: float, ruta_salida: str,
             .replace("'", "")
             .replace('"', "")
         )
+        # Rótulo tipo "lower third": barra translúcida abajo a la
+        # izquierda (no una caja gris centrada), con una línea de acento
+        # naranja arriba de la barra — estética más profesional/editorial.
         filtro_texto = (
-            f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize=64:"
-            f"font='DejaVu Sans Bold':borderw=4:bordercolor=black@0.9:"
-            f"box=1:boxcolor=black@0.45:boxborderw=20:"
-            f"x=(w-text_w)/2:y=h-220"
+            f"drawbox=x=0:y=h-160:w=760:h=110:color={COLOR_BARRA}@0.82:t=fill,"
+            f"drawbox=x=0:y=h-160:w=760:h=5:color={COLOR_ACENTO}@1.0:t=fill,"
+            f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize=42:"
+            f"font='DejaVu Sans Bold':"
+            f"x=50:y=h-115:"
+            f"alpha='if(lt(t,0.3),t/0.3,1)'"
         )
         filtros.append(filtro_texto)
 
