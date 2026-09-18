@@ -12,15 +12,16 @@ import os
 
 
 def generar_ambiente(ruta_salida: str, duracion_segundos: float):
-    # Dron grave con un ligero "beating" (dos senoidales muy cercanas en
-    # frecuencia) — da sensación de tensión de fondo sutil, sin sonar a
-    # música con derechos de autor.
+    # Dron grave con "beating" + una tercera capa más aguda muy tenue para
+    # dar textura (antes era casi inaudible a volumen 0.05 — ahora se nota
+    # de verdad como diseño sonoro sin tapar la voz).
     fade_out = max(duracion_segundos - 3, 0)
     filtro = (
         f"sine=frequency=55:duration={duracion_segundos}[a];"
         f"sine=frequency=58:duration={duracion_segundos}[b];"
-        f"[a][b]amix=inputs=2:duration=longest,"
-        f"volume=0.05,"
+        f"sine=frequency=110:duration={duracion_segundos}[c];"
+        f"[a][b][c]amix=inputs=3:duration=longest:weights=1 1 0.4,"
+        f"volume=0.14,"
         f"afade=t=in:st=0:d=3,afade=t=out:st={fade_out}:d=3"
     )
     comando = [
@@ -34,8 +35,13 @@ def generar_ambiente(ruta_salida: str, duracion_segundos: float):
 
 
 def mezclar_con_narracion(ruta_narracion: str, ruta_ambiente: str, ruta_salida: str):
-    """Mezcla la voz (volumen normal) con el ambiente (ya viene muy bajo)."""
-    filtro = "[0:a][1:a]amix=inputs=2:duration=first:dropout_transition=0"
+    """Mezcla voz + ambiente con auto-ducking real: el ambiente baja de
+    volumen automáticamente cuando hay voz sonando, y sube un poco en los
+    huecos — en vez de un volumen fijo bajo todo el rato."""
+    filtro = (
+        "[1:a][0:a]sidechaincompress=threshold=0.02:ratio=8:attack=50:release=400:makeup=1[amb_duck];"
+        "[0:a][amb_duck]amix=inputs=2:duration=first:dropout_transition=0"
+    )
     comando = [
         "ffmpeg", "-y", "-i", ruta_narracion, "-i", ruta_ambiente,
         "-filter_complex", filtro,
