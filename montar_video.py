@@ -12,7 +12,7 @@ import os
 import json
 
 from generar_intro import generar_intro, generar_outro
-from generar_ambiente import generar_ambiente, mezclar_con_narracion
+from generar_ambiente import generar_ambiente, mezclar_con_narracion, generar_alarma_intro
 
 
 def _duracion_audio(ruta: str) -> float:
@@ -75,8 +75,8 @@ def montar_video_final(carpeta_clips: str, carpeta_audios: str,
     generar_intro(ruta_intro)
     ruta_outro = ruta_salida + "_outro_temp.mp4"
     generar_outro(ruta_outro)
-    ruta_intro_silencio = ruta_salida + "_intro_silencio_temp.mp3"
-    _generar_silencio(ruta_intro_silencio, 3)
+    ruta_intro_silencio = ruta_salida + "_intro_alarma_temp.mp3"
+    generar_alarma_intro(ruta_intro_silencio, 3)
     ruta_outro_silencio = ruta_salida + "_outro_silencio_temp.mp3"
     _generar_silencio(ruta_outro_silencio, 3)
 
