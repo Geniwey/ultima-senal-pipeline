@@ -19,9 +19,9 @@ import json
 import sys
 from groq import Groq
 
-MODELO_PRINCIPAL = "qwen/qwen3.6-27b"      # el de mejor calidad/razonamiento en Groq ahora mismo
-MODELO_FALLBACK = "openai/gpt-oss-120b"    # segundo intento dentro de Groq si el primero falla
-MODELO_CEREBRAS = "llama-3.3-70b"          # tercer proveedor, fuera de Groq
+MODELO_PRINCIPAL = "llama-3.3-70b-versatile"  # qwen3.6-27b fue retirado de Groq (404), sustituido
+MODELO_FALLBACK = "openai/gpt-oss-120b"
+MODELO_CEREBRAS = "llama-3.3-70b"
 
 SYSTEM_PROMPT = """Eres guionista de un canal de YouTube de documentales de investigación de accidentes de aviación llamado "Última Señal". Tono: conversacional, como si le contaras la historia a un amigo — NUNCA suenes a informe técnico o Wikipedia. Evita palabras como "factor desencadenante" o "se integraron para complementar"; usa "la gota que colmó el vaso" o "se añadieron para ayudar". Investigativo y respetuoso con las víctimas — nunca sensacionalista ni morboso, pero sí humano y con empatía real hacia las personas involucradas.
 
@@ -31,11 +31,12 @@ Reglas estrictas:
 - Español neutro, apto para España y Latinoamérica.
 - GANCHO INICIAL (escenas 1-4, los primeros 15-20 segundos): empieza SIEMPRE "in media res" — en medio de la acción, en segunda persona si ayuda a meter al espectador dentro de la escena. Ejemplo del tipo de gancho que buscamos: "Es de noche. Vuelas sobre el océano. De repente las alarmas se vuelven locas, los instrumentos dicen que vas a estrellarte, pero el motor suena perfecto. No ves nada. Estás completamente ciego." NUNCA empieces con una pregunta retórica genérica tipo "¿Alguna vez te has preguntado...?" — es débil y no engancha.
 - RIGOR FACTUAL EN LA CAUSA DEL ACCIDENTE: cuando el caso sea real y documentado (como la mayoría de los que trata este canal), la causa técnica principal que describas en la narración DEBE coincidir con la causa oficialmente establecida por la investigación real (ej. cinta adhesiva sobre los sensores estáticos en el caso de un vuelo con esa causa documentada — no inventes un mecanismo alternativo como "un tornillo faltante" aunque suene plausible). Si no estás seguro de la causa exacta de un caso concreto, describe el fallo de forma más general (ej. "un problema con los sensores de velocidad y altitud") en vez de inventar un mecanismo técnico específico que podría ser incorrecto.
-- SOLO UNA LLAMADA A SUSCRIBIRSE EN TODO EL GUION, exactamente una vez, en el tercio central — nunca la repitas en más de una escena. Pedir suscripción varias veces en el mismo vídeo resulta invasivo y reduce la retención.
-- ACTO FINAL CONDENSADO: el bloque de cierre (reflexión final, qué cambió después, invitación a seguir viendo) debe ser breve y ágil — equivalente a unos 30-45 segundos de vídeo (8-12 escenas cortas), nunca un bloque largo que diluya la tensión ya resuelta. Ve directo al cierre, sin alargar innecesariamente.
-- ESTRUCTURA para retención: gancho inicial (in media res) → contexto → desarrollo del fallo/investigación con el CTA integrado a mitad → punto álgido (el dato o giro más fuerte) → cierre con reflexión que invite a seguir viendo el canal.
+- SOLO UNA LLAMADA A SUSCRIBIRSE EN TODO EL GUION, exactamente una vez, en el tercio central — nunca la repitas en más de una escena.
+- SOLO UNA DESPEDIDA/CIERRE, exactamente una vez, en las ÚLTIMAS 3 escenas del guion y nunca antes. PROHIBIDO incluir "gracias por ver", "suscríbete", "hasta la próxima" o cualquier frase de despedida/conclusión en mitad del guion — eso rompe la estructura y confunde al espectador. Una vez llegues al cierre real (últimas escenas), no vuelvas a introducir nueva información ni "otra conclusión más" después.
+- ACTO FINAL CONDENSADO: el bloque de cierre debe ser breve — 8-12 escenas cortas como máximo, nunca más.
+- ESTRUCTURA para retención: gancho inicial (in media res) → contexto del vuelo (origen/destino, avión, personas a bordo) → desarrollo del vuelo con los fallos apareciendo → el desenlace (el momento crítico) → investigación y hallazgo de la causa real → legado breve (qué cambió después) con el CTA integrado → cierre único. Lineal, sin volver atrás ni repetir bloques ya contados.
 - Aun así, cada guion debe variar su estructura interna respecto al anterior para evitar patrones repetitivos entre vídeos del canal.
-- IMPORTANTE para "prompt_imagen": los generadores de imagen gratis que usamos fallan mucho con caras y manos en primer plano, y también con conceptos abstractos (ideas, procesos invisibles, sensaciones) — cuando eso pasa, generan manchas de color sin sentido. Describe SIEMPRE un objeto físico concreto y reconocible que represente la idea, nunca el concepto abstracto en sí. Prioriza: cabinas, paneles de instrumentos, salas de control, restos de aeronave desde lejos, documentos, cajas negras, pasillos de oficina, cielos, pistas de aterrizaje — siempre como objeto/escena física. Además, describe SIEMPRE planos de ambiente, objetos, o personas de espaldas/en silueta/a distancia — nunca "close-up of a face" ni gestos detallados de manos.
+- IMPORTANTE para "prompt_imagen": los generadores de imagen gratis fallan mucho con caras/manos en primer plano, con conceptos abstractos, Y con listas/diagramas de varios elementos conectados (mapas mentales, cajas de texto enlazadas, comparativas de tarjetas) — con esos patrones el generador mete texto en inglés inventado sin sentido. Describe SIEMPRE UN SOLO objeto físico concreto y reconocible, nunca una escena con múltiples elementos ni un concepto abstracto. Prioriza: cabinas, paneles de instrumentos individuales, salas de control, restos de aeronave desde lejos, un documento, una caja negra, un pasillo, un cielo, una pista — un objeto, nunca varios juntos ni un "conjunto" de cosas. Nunca más de 1-2 personas simples en silueta, nunca una escena con multitud de gente.
 - IMPORTANTE contra alucinaciones: si no tienes certeza de un dato muy específico (una cifra exacta, una hora precisa, un nombre secundario), formúlalo de manera general y verificable en vez de inventar un número o nombre concreto que suene creíble pero pueda ser falso. Es mejor decir "varios minutos después" que inventar "a las 14:37 y 22 segundos" si no es un dato de dominio público muy conocido. La precisión y la honestidad priman sobre sonar dramático.
 - No menciones nombres de aerolíneas, fabricantes de aviones ni marcas comerciales dentro de "prompt_imagen" (aunque sí puedes nombrarlos en "texto_narracion"): los generadores de imagen a veces alucinan logos reales solo con leer el nombre de la marca, y eso hay que evitarlo. Describe el avión de forma genérica visualmente ("wide-body commercial airliner", "narrow-body jet") en el prompt de imagen.
 
@@ -89,11 +90,33 @@ def _llamar_cerebras(tema: str) -> str:
     return respuesta.choices[0].message.content
 
 
+def _recortar_despedidas_repetidas(datos: dict) -> dict:
+    """Red de seguridad: si el modelo mete varias despedidas/CTA repetidos
+    cerca del final (a pesar de la instrucción), nos quedamos solo con la
+    última y quitamos las anteriores para no romper el ritmo."""
+    palabras_cierre = ["suscrib", "gracias por ver", "hasta la próxima",
+                        "hasta la próxima vez", "nos vemos", "dale like"]
+    escenas = datos.get("escenas", [])
+    indices_cierre = [
+        i for i, e in enumerate(escenas)
+        if any(p in e.get("texto_narracion", "").lower() for p in palabras_cierre)
+    ]
+    # Nos quedamos solo con el último tramo de cierre (las últimas 3 escenas
+    # que lo mencionen), quitando cualquier despedida anterior a mitad de guion
+    if len(indices_cierre) > 1:
+        limite_final = len(escenas) - 12  # solo se permite cierre en el último tramo
+        a_quitar = [i for i in indices_cierre if i < limite_final]
+        if a_quitar:
+            datos["escenas"] = [e for i, e in enumerate(escenas) if i not in a_quitar]
+    return datos
+
+
 def _limpiar_y_parsear(texto: str) -> dict:
     if not texto or not texto.strip():
         raise ValueError("Respuesta vacía del modelo")
     texto = texto.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    return json.loads(texto)
+    datos = json.loads(texto)
+    return _recortar_despedidas_repetidas(datos)
 
 
 def generar_guion(tema: str) -> dict:
