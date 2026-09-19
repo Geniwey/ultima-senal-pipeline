@@ -34,10 +34,16 @@ import requests
 # ESTILO VISUAL DEL CANAL
 # ---------------------------------------------------------------------------
 ESTILO_BASE = (
-    "single simple flat vector icon illustration, one isolated pictogram, "
-    "minimalist modern icon design, bold flat colors, thick clean outlines, "
-    "simple stick-figure or flat-icon character only if a person is needed, "
-    "no photorealism, no gradients, plain solid background, "
+    "single technical icon illustration, editorial documentary style, "
+    "serious and somber mood, precise clean linework like a technical "
+    "schematic or blueprint diagram, thick clean outlines, subtle inner "
+    "shading for depth (not flat cartoon clipart), "
+    "simple stick-figure silhouette only if a person is needed, "
+    "no photorealism, no cute or playful style, not childish, not corporate "
+    "clipart, DARK BACKGROUND BY DEFAULT: deep navy blue or charcoal black "
+    "solid background (this happened at night over the ocean — keep it "
+    "somber and dark), off-white used only as a small accent color on the "
+    "icon itself, never as the main background, "
     "ABSOLUTE RULES: only ONE icon or object per image, nothing else in "
     "frame, no multiple elements, no dashboard layout, no diagram with "
     "connected nodes, no checklist, no chart, no report document mockup, "
@@ -245,6 +251,18 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
     return False
 
 
+NEGATIVE_PROMPT = (
+    "text, letters, words, numbers, labels, typography, writing, caption, "
+    "gibberish text, fake english, watermark, logo, signature, "
+    "multiple panels, diagram, mind map, connected boxes, flowchart, "
+    "comparison cards, dashboard, checklist, business presentation, "
+    "powerpoint slide, corporate template, infographic chart, "
+    "crowd of people, multiple people, low quality, blurry, distorted, "
+    "cute, childish, playful, cartoon, clipart, beige background, "
+    "white background, light background, bright colors, human resources style"
+)
+
+
 def _intentar_modelslab(prompt_completo: str, ruta_salida: str) -> bool:
     api_key = os.environ.get("MODELSLAB_API_KEY")
     if not api_key:
@@ -255,6 +273,7 @@ def _intentar_modelslab(prompt_completo: str, ruta_salida: str) -> bool:
     payload = {
         "key": api_key,
         "prompt": prompt_completo,
+        "negative_prompt": NEGATIVE_PROMPT,
         "width": "1024",
         "height": "576",
         "samples": "1",
@@ -341,22 +360,23 @@ def _intentar_gradio(prompt_completo: str, ruta_salida: str) -> bool:
 def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) -> bool:
     """
     Genera una imagen para una escena, con fallback en cascada:
-    Cloudflare (principal) → ModelsLab → Nano Banana (bonus) →
+    ModelsLab (principal — admite negative_prompt real, bloquea texto/diagramas
+    de forma mucho más fiable) → Cloudflare → Nano Banana (bonus) →
     Gradio/HF Spaces (bonus) → Hugging Face directo (último recurso).
     """
     prompt_completo = f"{ESTILO_BASE}, {_limpiar_prompt(prompt_escena)}"
 
-    print("  Intentando con Cloudflare Workers AI...")
-    if _intentar_cloudflare(prompt_completo, ruta_salida):
-        print("  ✓ Imagen válida generada con Cloudflare")
-        return True
-
-    print("  Cloudflare falló, probando ModelsLab...")
+    print("  Intentando con ModelsLab (con negative_prompt anti-texto)...")
     if _intentar_modelslab(prompt_completo, ruta_salida):
         print("  ✓ Imagen válida generada con ModelsLab")
         return True
 
-    print("  ModelsLab también falló, probando Nano Banana (Gemini)...")
+    print("  ModelsLab falló, probando Cloudflare Workers AI...")
+    if _intentar_cloudflare(prompt_completo, ruta_salida):
+        print("  ✓ Imagen válida generada con Cloudflare")
+        return True
+
+    print("  Cloudflare también falló, probando Nano Banana (Gemini)...")
     if _intentar_gemini(prompt_completo, ruta_salida):
         print("  ✓ Imagen válida generada con Nano Banana")
         return True
