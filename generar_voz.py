@@ -65,6 +65,20 @@ def _anadir_pausa(ruta_audio: str, segundos: float = 1.2):
         os.replace(ruta_temp, ruta_audio)
 
 
+def _generar_silencio_por_defecto(ruta_salida: str, texto: str):
+    """Último recurso si Edge TTS falla varias veces para una escena: en
+    vez de tirar todo el vídeo abajo, generamos un silencio con duración
+    estimada por el largo del texto (~2.3 palabras/segundo hablando
+    pausado) para que esa escena tenga igualmente su hueco de tiempo."""
+    palabras = max(len(texto.split()), 3)
+    duracion = round(palabras / 2.3, 1)
+    comando = [
+        "ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
+        "-t", str(duracion), "-q:a", "9", "-acodec", "libmp3lame", ruta_salida,
+    ]
+    subprocess.run(comando, capture_output=True, text=True)
+
+
 def generar_voces(ruta_guion: str, carpeta_salida: str) -> list:
     os.makedirs(carpeta_salida, exist_ok=True)
     with open(ruta_guion, "r", encoding="utf-8") as f:
@@ -79,17 +93,25 @@ def generar_voces(ruta_guion: str, carpeta_salida: str) -> list:
 
         intentos = 0
         exito = False
-        while intentos < 2 and not exito:
+        while intentos < 4 and not exito:
             try:
                 asyncio.run(_generar_audio_escena(escena["texto_narracion"], ruta_audio, velocidad, tono))
                 if os.path.exists(ruta_audio) and os.path.getsize(ruta_audio) > 1000:
                     exito = True
             except Exception as e:
                 print(f"    fallo intento {intentos+1}: {e}")
+                import time
+                time.sleep(2)
             intentos += 1
 
         if not exito:
-            raise RuntimeError(f"No se pudo generar voz para la escena {i}")
+            # Red de seguridad: no tiramos el vídeo entero por una sola
+            # escena — generamos un silencio de duración equivalente y
+            # seguimos. Se pierde la narración de esa frase, pero el
+            # vídeo se completa igualmente.
+            print(f"  ⚠ No se pudo generar voz para la escena {i} tras 4 intentos — "
+                  f"se usa un silencio de relleno para no interrumpir el vídeo")
+            _generar_silencio_por_defecto(ruta_audio, escena["texto_narracion"])
 
         if _es_punto_dramatico(i, total_escenas):
             _anadir_pausa(ruta_audio, 1.2)
