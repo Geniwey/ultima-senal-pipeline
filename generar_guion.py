@@ -19,9 +19,9 @@ import json
 import sys
 from groq import Groq
 
-MODELO_PRINCIPAL = "llama-3.3-70b-versatile"  # qwen3.6-27b fue retirado de Groq (404), sustituido
-MODELO_FALLBACK = "openai/gpt-oss-120b"
-MODELO_CEREBRAS = "llama-3.3-70b"
+MODELO_PRINCIPAL = "openai/gpt-oss-120b"   # el único que ha funcionado sin fallar en todas las pruebas
+MODELO_FALLBACK = "openai/gpt-oss-20b"     # segundo intento dentro de Groq si el primero falla
+MODELO_CEREBRAS = "llama-3.3-70b"          # tercer proveedor, fuera de Groq
 
 SYSTEM_PROMPT = """Eres guionista de un canal de YouTube de documentales de investigación de accidentes de aviación llamado "Última Señal". Tono: conversacional, como si le contaras la historia a un amigo — NUNCA suenes a informe técnico o Wikipedia. Evita palabras como "factor desencadenante" o "se integraron para complementar"; usa "la gota que colmó el vaso" o "se añadieron para ayudar". Investigativo y respetuoso con las víctimas — nunca sensacionalista ni morboso, pero sí humano y con empatía real hacia las personas involucradas.
 
