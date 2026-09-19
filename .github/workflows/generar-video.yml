@@ -35,9 +35,9 @@ jobs:
           # a la calidad de las imágenes/estilo (proveedor, prompts, etc.)
           # para que la caché vieja se invalide sola y no se reutilicen
           # imágenes generadas con una versión anterior peor del pipeline.
-          key: ultima-senal-v2-${{ inputs.titulo }}-${{ github.run_id }}
+          key: ultima-senal-v3-${{ inputs.titulo }}-${{ github.run_id }}
           restore-keys: |
-            ultima-senal-v2-${{ inputs.titulo }}-
+            ultima-senal-v3-${{ inputs.titulo }}-
 
       - name: Ejecutar pipeline completo
         env:
