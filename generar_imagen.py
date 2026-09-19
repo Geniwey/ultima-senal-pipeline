@@ -357,26 +357,40 @@ def _intentar_gradio(prompt_completo: str, ruta_salida: str) -> bool:
     return False
 
 
+def _generar_imagen_emergencia(ruta_salida: str) -> bool:
+    """Última red de seguridad absoluta: si los 4 proveedores de IA fallan
+    a la vez (como pasó el 19/09 al agotar todo el cupo gratis del día en
+    pruebas), generamos localmente una tarjeta de marca simple con FFmpeg
+    —sin depender de ninguna API— para que el vídeo se complete igual,
+    en vez de morir del todo."""
+    import subprocess
+    filtro = (
+        f"color=c=0x1B2A4A:s=1024x576:d=1,"
+        f"drawbox=x=50:y=50:w=924:h=476:color=0xC1502E@1.0:t=4"
+    )
+    comando = ["ffmpeg", "-y", "-f", "lavfi", "-i", filtro, "-frames:v", "1", ruta_salida]
+    resultado = subprocess.run(comando, capture_output=True, text=True)
+    return resultado.returncode == 0 and os.path.exists(ruta_salida)
+
+
 def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) -> bool:
     """
     Genera una imagen para una escena, con fallback en cascada:
-    ModelsLab (principal — admite negative_prompt real, bloquea texto/diagramas
-    de forma mucho más fiable) → Cloudflare → Nano Banana (bonus) →
+    Cloudflare (principal) → Nano Banana (bonus) →
     Gradio/HF Spaces (bonus) → Hugging Face directo (último recurso).
+    ModelsLab quitado: su endpoint "realtime" en realidad exige plan de
+    pago ("You need to be subscribed to a plan..."), no es gratis como
+    se pensaba — se deja la función por si algún día se activa con otro
+    plan, pero no se llama en la cascada para no perder tiempo en vano.
     """
     prompt_completo = f"{ESTILO_BASE}, {_limpiar_prompt(prompt_escena)}"
 
-    print("  Intentando con ModelsLab (con negative_prompt anti-texto)...")
-    if _intentar_modelslab(prompt_completo, ruta_salida):
-        print("  ✓ Imagen válida generada con ModelsLab")
-        return True
-
-    print("  ModelsLab falló, probando Cloudflare Workers AI...")
+    print("  Intentando con Cloudflare Workers AI...")
     if _intentar_cloudflare(prompt_completo, ruta_salida):
         print("  ✓ Imagen válida generada con Cloudflare")
         return True
 
-    print("  Cloudflare también falló, probando Nano Banana (Gemini)...")
+    print("  Cloudflare falló, probando Nano Banana (Gemini)...")
     if _intentar_gemini(prompt_completo, ruta_salida):
         print("  ✓ Imagen válida generada con Nano Banana")
         return True
@@ -391,7 +405,12 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) ->
         print("  ✓ Imagen válida generada con Hugging Face")
         return True
 
-    print(f"  ✗ FALLO TOTAL (5 proveedores agotados) generando imagen para: {prompt_escena[:60]}...")
+    print("  Los 4 proveedores de IA fallaron — usando tarjeta de marca de emergencia (sin IA)...")
+    if _generar_imagen_emergencia(ruta_salida):
+        print("  ✓ Imagen de emergencia generada (el vídeo se completa igual)")
+        return True
+
+    print(f"  ✗ FALLO TOTAL generando imagen para: {prompt_escena[:60]}...")
     return False
 
 
