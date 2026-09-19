@@ -22,19 +22,27 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
         titulo_corto.upper()
         .replace("\\", "").replace(":", "").replace("'", "").replace('"', "")
     )
-    # Varias cajas semitransparentes apiladas simulan un degradado hacia
-    # abajo (fiable en cualquier FFmpeg, sin filtros complejos que puedan
-    # fallar), barra de acento de marca, y texto grande con contorno fuerte.
+    # Marco de acento grueso alrededor de toda la miniatura (look "canal
+    # serio" tipo documental true-crime), viñeta oscura en los bordes para
+    # dar profundidad, degradado inferior más fuerte, y texto más grande
+    # con doble contorno — se aleja del aspecto plano de diapositiva.
     filtro = (
         "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,"
-        "drawbox=x=0:y=500:w=1280:h=55:color=black@0.15:t=fill,"
-        "drawbox=x=0:y=555:w=1280:h=55:color=black@0.30:t=fill,"
-        "drawbox=x=0:y=610:w=1280:h=55:color=black@0.50:t=fill,"
-        "drawbox=x=0:y=665:w=1280:h=55:color=black@0.68:t=fill,"
-        f"drawbox=x=0:y=690:w=1280:h=8:color={COLOR_ACENTO}@1.0:t=fill,"
-        f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize=104:"
-        f"font='DejaVu Sans Bold':borderw=8:bordercolor=black@1.0:"
-        "x=(w-text_w)/2:y=h-235"
+        "eq=contrast=1.12:saturation=1.15,"
+        "vignette=angle=PI/4:mode=backward,"
+        "drawbox=x=0:y=480:w=1280:h=40:color=black@0.10:t=fill,"
+        "drawbox=x=0:y=520:w=1280:h=40:color=black@0.25:t=fill,"
+        "drawbox=x=0:y=560:w=1280:h=40:color=black@0.42:t=fill,"
+        "drawbox=x=0:y=600:w=1280:h=40:color=black@0.60:t=fill,"
+        "drawbox=x=0:y=640:w=1280:h=80:color=black@0.78:t=fill,"
+        f"drawbox=x=0:y=690:w=1280:h=10:color={COLOR_ACENTO}@1.0:t=fill,"
+        f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize=112:"
+        f"font='DejaVu Sans Bold':borderw=10:bordercolor=black@1.0:"
+        "x=(w-text_w)/2:y=h-225,"
+        f"drawbox=x=0:y=0:w=1280:h=14:color={COLOR_BORDE}@1.0:t=fill,"
+        f"drawbox=x=0:y=706:w=1280:h=14:color={COLOR_BORDE}@1.0:t=fill,"
+        f"drawbox=x=0:y=0:w=14:h=720:color={COLOR_BORDE}@1.0:t=fill,"
+        f"drawbox=x=1266:y=0:w=14:h=720:color={COLOR_BORDE}@1.0:t=fill"
     )
     comando = [
         "ffmpeg", "-y", "-i", ruta_imagen_base,
