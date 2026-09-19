@@ -57,15 +57,19 @@ def animar_imagen(ruta_imagen: str, duracion_segundos: float, ruta_salida: str,
             .replace("'", "")
             .replace('"', "")
         )
-        # Rótulo tipo "lower third": barra translúcida abajo a la
-        # izquierda (no una caja gris centrada), con una línea de acento
-        # naranja arriba de la barra — estética más profesional/editorial.
+        # Posiciones en píxeles fijos (ANCHO/ALTO son constantes = 1920x1080):
+        # antes usábamos "h-160" dentro de un drawbox que TAMBIÉN tenía un
+        # parámetro propio "h=110" — ffmpeg confundía ambos "h" y la barra
+        # salía mal colocada. Con números fijos no hay ambigüedad posible.
+        barra_y = ALTO - 160      # 920
+        barra_alto = 110
+        texto_y = ALTO - 115      # 965
         filtro_texto = (
-            f"drawbox=x=0:y=h-160:w=760:h=110:color={COLOR_BARRA}@0.82:t=fill,"
-            f"drawbox=x=0:y=h-160:w=760:h=5:color={COLOR_ACENTO}@1.0:t=fill,"
-            f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize=42:"
-            f"font='DejaVu Sans Bold':"
-            f"x=50:y=h-115:"
+            f"drawbox=x=0:y={barra_y}:w=760:h={barra_alto}:color={COLOR_BARRA}@0.85:t=fill,"
+            f"drawbox=x=0:y={barra_y}:w=760:h=5:color={COLOR_ACENTO}@1.0:t=fill,"
+            f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize=46:"
+            f"font='DejaVu Sans Bold':borderw=2:bordercolor=black@0.6:"
+            f"x=50:y={texto_y}:"
             f"alpha='if(lt(t,0.3),t/0.3,1)'"
         )
         filtros.append(filtro_texto)
