@@ -101,13 +101,13 @@ def _recortar_despedidas_repetidas(datos: dict) -> dict:
         i for i, e in enumerate(escenas)
         if any(p in e.get("texto_narracion", "").lower() for p in palabras_cierre)
     ]
-    # Nos quedamos solo con el último tramo de cierre (las últimas 3 escenas
-    # que lo mencionen), quitando cualquier despedida anterior a mitad de guion
+    # Nos quedamos SOLO con la última despedida de todo el guion — se quitan
+    # TODAS las demás, estén donde estén (antes solo se quitaban las de
+    # mitad de vídeo, dejando pasar varias despedidas seguidas al final).
     if len(indices_cierre) > 1:
-        limite_final = len(escenas) - 12  # solo se permite cierre en el último tramo
-        a_quitar = [i for i in indices_cierre if i < limite_final]
-        if a_quitar:
-            datos["escenas"] = [e for i, e in enumerate(escenas) if i not in a_quitar]
+        ultimo = indices_cierre[-1]
+        a_quitar = [i for i in indices_cierre if i != ultimo]
+        datos["escenas"] = [e for i, e in enumerate(escenas) if i not in a_quitar]
     return datos
 
 
