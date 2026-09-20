@@ -26,10 +26,19 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
     # serio" tipo documental true-crime), viñeta oscura en los bordes para
     # dar profundidad, degradado inferior más fuerte, y texto más grande
     # con doble contorno — se aleja del aspecto plano de diapositiva.
+    # Círculo rojo de "atención" en una esquina — el clásico elemento de
+    # alto contraste de miniaturas de true-crime/investigación que dirige
+    # el ojo hacia el punto clave de la imagen.
+    cx, cy, radio = 1120, 140, 70
+    circulo = (
+        f"drawbox=x={cx-radio}:y={cy-6}:w={radio*2}:h=12:color=red@0.95:t=fill,"
+        f"drawbox=x={cx-6}:y={cy-radio}:w=12:h={radio*2}:color=red@0.95:t=fill"
+    )
     filtro = (
         "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,"
         "eq=contrast=1.12:saturation=1.15,"
         "vignette=angle=PI/4:mode=backward,"
+        f"{circulo},"
         "drawbox=x=0:y=480:w=1280:h=40:color=black@0.10:t=fill,"
         "drawbox=x=0:y=520:w=1280:h=40:color=black@0.25:t=fill,"
         "drawbox=x=0:y=560:w=1280:h=40:color=black@0.42:t=fill,"
