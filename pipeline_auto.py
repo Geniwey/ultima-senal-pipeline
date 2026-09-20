@@ -107,7 +107,9 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
         f.write("=== CAPÍTULOS (pega esto dentro de la descripción) ===\n")
         f.write("\n".join(capitulos) + "\n\n")
         f.write("=== TAGS (separados por coma) ===\n")
-        f.write(", ".join(guion.get("tags_youtube", [])) + "\n")
+        f.write(", ".join(guion.get("tags_youtube", [])) + "\n\n")
+        f.write("=== COMENTARIO PARA FIJAR (pégalo y fíjalo tú en YouTube) ===\n")
+        f.write(guion.get("comentario_fijado", "") + "\n")
     print(f"✓ Metadata de YouTube guardada en {ruta_metadata}")
 
     # Miniatura: reutilizamos una imagen que YA generamos bien para el
