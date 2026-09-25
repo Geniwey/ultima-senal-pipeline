@@ -1,27 +1,16 @@
 """
 Última Señal — Generador de imágenes con fallback automático (4 proveedores)
 ================================================================================
-Orden de proveedores (Cloudflare primero: es el que de verdad aguanta un
-vídeo entero sin fallar; el cupo gratis de imágenes de Gemini se ha
-recortado mucho en 2026 y no da ni para un tercio de un vídeo):
-Intento 1: Cloudflare Workers AI - Flux Schnell (gratis, cuota diaria)
-Intento 2: ModelsLab (gratis, 100 imágenes/día)
-Intento 3: Nano Banana / Gemini (bonus si funciona — cupo gratis muy bajo
-           ahora mismo, y con un bug conocido de Google que a veces lo deja
-           en 0. Se deja como intento por si en algún momento funciona,
-           pero no se cuenta con él.)
-Intento 4: Hugging Face (última red de seguridad, modelo variable)
+Orden: Cloudflare (principal) → Nano Banana/Gemini (bonus) →
+Gradio/HF Spaces (bonus) → Hugging Face directo (último recurso) →
+tarjeta de marca de emergencia (sin IA, nunca falla).
 
-Uso:
-    python generar_imagen.py "prompt de la escena" salida.png
-    python generar_imagen.py --test   # genera 4 imágenes de prueba con el estilo del canal
-
-Configuración necesaria (variables de entorno):
-    CF_ACCOUNT_ID     -> ID de cuenta de Cloudflare
-    CF_API_TOKEN      -> Token de API de Cloudflare Workers AI
-    MODELSLAB_API_KEY -> clave gratis de modelslab.com
-    GEMINI_API_KEY, GEMINI_API_KEY_2 -> claves gratis de aistudio.google.com (opcionales)
-    HF_API_TOKEN      -> Token de Hugging Face (opcional, último recurso)
+IMPORTANTE sobre el prompt: el SUJETO (qué dibujar) va SIEMPRE primero,
+el estilo va corto y después. Con un modelo rápido/pequeño como
+flux-2-klein, un bloque de estilo larguísimo puesto ANTES del sujeto
+hace que el modelo "gaste" su atención ahí y produzca solo fondo/marco,
+ignorando lo que realmente pedimos dibujar — eso es lo que causó las
+tarjetas vacías repetidas en varias pruebas.
 """
 
 import os
@@ -30,33 +19,10 @@ import time
 import base64
 import requests
 
-# ---------------------------------------------------------------------------
-# ESTILO VISUAL DEL CANAL
-# ---------------------------------------------------------------------------
 ESTILO_BASE = (
-    "single technical icon illustration, editorial documentary style, "
-    "serious and somber mood, precise clean linework like a technical "
-    "schematic or blueprint diagram, thick clean outlines, subtle inner "
-    "shading for depth (not flat cartoon clipart), "
-    "simple stick-figure silhouette only if a person is needed, "
-    "no photorealism, no cute or playful style, not childish, not corporate "
-    "clipart, DARK BACKGROUND BY DEFAULT: deep navy blue or charcoal black "
-    "solid background (this happened at night over the ocean — keep it "
-    "somber and dark), off-white used only as a small accent color on the "
-    "icon itself, never as the main background, "
-    "ABSOLUTE RULES: only ONE icon or object per image, nothing else in "
-    "frame, no multiple elements, no dashboard layout, no diagram with "
-    "connected nodes, no checklist, no chart, no report document mockup, "
-    "no PowerPoint style, no business presentation template, no corporate "
-    "slide design, no infographic layout with multiple panels, "
-    "absolutely no text, no letters, no words, no numbers, no labels, no "
-    "gibberish writing anywhere in the image, no watermark, no logos, "
-    "no detailed faces, no detailed hands, "
-    "clearly recognizable everyday object, simple and literal illustration "
-    "of the concept, not abstract art, no abstract shapes, "
-    "STRICT BRAND COLOR PALETTE ONLY: deep navy blue (#1B2A4A), burnt "
-    "orange (#C1502E), off-white (#E8E6DE), charcoal black (#2B2B2B) — "
-    "use only these four colors plus their light/dark shades, no other hues"
+    "flat technical icon illustration, dark navy or black background, "
+    "burnt orange accent color, thick clean outlines, single object, "
+    "no text, no people crowd, documentary style, not childish"
 )
 
 PALABRAS_A_EVITAR = [
@@ -73,15 +39,17 @@ def _limpiar_prompt(prompt: str) -> str:
     return prompt_limpio.strip()
 
 
+NEGATIVE_PROMPT = (
+    "text, letters, words, watermark, logo, multiple panels, diagram, "
+    "dashboard, powerpoint, infographic chart, crowd of people, "
+    "blurry, low quality, empty background, blank frame"
+)
+
 PROMPTS_TEST = [
-    "aircraft cockpit instrument panel at night, warning lights glowing, "
-    "empty cockpit, tense atmosphere",
-    "air traffic control radar room, dim blue monitors, empty chair, "
-    "night shift, quiet tension",
-    "aviation accident investigation team examining wreckage debris field "
-    "at dawn, fog, investigators in the distance, respectful wide shot",
-    "black box flight recorder on a metal table, evidence bag, "
-    "forensic lab lighting, close up, investigation office",
+    "aircraft cockpit instrument panel at night, warning lights glowing",
+    "air traffic control radar room, dim blue monitors, empty chair",
+    "black box flight recorder on a metal table, evidence bag",
+    "roll of adhesive tape covering an aircraft sensor, close up",
 ]
 
 TIMEOUT = 30
@@ -90,10 +58,6 @@ TAMANO_MINIMO_BYTES = 15_000
 _cloudflare_agotado = [False]
 _gemini_claves_agotadas = set()
 
-# Margen prudente entre peticiones a Nano Banana para no toparnos con su
-# límite de peticiones/minuto del plan gratis (más generoso que el de
-# Pollinations, pero sigue existiendo) — así 100 imágenes tardan unos
-# 10-12 min, no 25+.
 GEMINI_ESPACIADO_SEGUNDOS = 6.5
 _ultima_llamada_gemini = [0.0]
 
@@ -108,68 +72,6 @@ def _validar_imagen(ruta: str) -> bool:
     return cabecera.startswith(b"\x89PNG") or cabecera.startswith(b"\xff\xd8\xff")
 
 
-def _claves_gemini_disponibles() -> list:
-    """Lee todas las claves de Google configuradas (GEMINI_API_KEY,
-    GEMINI_API_KEY_2, GEMINI_API_KEY_3...) que aún no se hayan agotado hoy."""
-    claves = []
-    for nombre in ("GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3"):
-        valor = os.environ.get(nombre)
-        if valor:
-            claves.append((nombre, valor))
-    return [c for c in claves if c[0] not in _gemini_claves_agotadas]
-
-
-def _intentar_gemini(prompt_completo: str, ruta_salida: str) -> bool:
-    claves = _claves_gemini_disponibles()
-    if not claves:
-        if not any(os.environ.get(n) for n in ("GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3")):
-            print("  [Nano Banana] falta GEMINI_API_KEY, se salta este proveedor")
-        else:
-            print("  [Nano Banana] todas las claves configuradas se agotaron hoy, se salta este proveedor")
-        return False
-
-    espera_necesaria = GEMINI_ESPACIADO_SEGUNDOS - (time.time() - _ultima_llamada_gemini[0])
-    if espera_necesaria > 0:
-        time.sleep(espera_necesaria)
-    _ultima_llamada_gemini[0] = time.time()
-
-    payload = {"contents": [{"parts": [{"text": prompt_completo}]}]}
-    modelos = ["gemini-3.1-flash-lite-image", "gemini-3.1-flash-image"]
-
-    # Rotamos entre todas las claves disponibles: si una se agota a mitad
-    # de la ejecución, las siguientes imágenes usan automáticamente la
-    # otra clave en vez de caer directamente a Cloudflare.
-    for nombre_clave, api_key in claves:
-        headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
-        for modelo in modelos:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
-            try:
-                resp = requests.post(url, headers=headers, json=payload, timeout=TIMEOUT)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    partes = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-                    for parte in partes:
-                        inline = parte.get("inlineData") or parte.get("inline_data")
-                        if inline and inline.get("data"):
-                            with open(ruta_salida, "wb") as f:
-                                f.write(base64.b64decode(inline["data"]))
-                            return _validar_imagen(ruta_salida)
-                    print(f"  [Nano Banana/{nombre_clave}/{modelo}] respuesta sin imagen: {resp.text[:200]}")
-                elif resp.status_code == 429:
-                    print(f"  [Nano Banana/{nombre_clave}] límite alcanzado, "
-                          f"pasando a la siguiente clave si hay: {resp.text[:120]}")
-                    _gemini_claves_agotadas.add(nombre_clave)
-                    break  # probar la siguiente clave, no el otro modelo de esta misma
-                elif resp.status_code == 404:
-                    print(f"  [Nano Banana/{nombre_clave}/{modelo}] modelo no encontrado (404), probando el siguiente...")
-                    continue
-                else:
-                    print(f"  [Nano Banana/{nombre_clave}/{modelo}] respuesta {resp.status_code}: {resp.text[:200]}")
-            except requests.RequestException as e:
-                print(f"  [Nano Banana/{nombre_clave}/{modelo}] fallo de red: {e}")
-    return False
-
-
 def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
     if _cloudflare_agotado[0]:
         return False
@@ -182,8 +84,6 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
 
     headers = {"Authorization": f"Bearer {api_token}"}
 
-    # --- Intento A: FLUX.2 [klein] 9B — modelo nuevo, mejor calidad según
-    # la propia Cloudflare. Usa multipart/form-data, no JSON. ---
     url_klein = (
         f"https://api.cloudflare.com/client/v4/accounts/{account_id}"
         f"/ai/run/@cf/black-forest-labs/flux-2-klein-9b"
@@ -221,8 +121,6 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
     if _cloudflare_agotado[0]:
         return False
 
-    # --- Intento B (respaldo dentro de Cloudflare): flux-1-schnell, el
-    # modelo anterior, por si klein fallara por algún motivo puntual ---
     print("  [Cloudflare] flux-2-klein falló, probando flux-1-schnell...")
     url_schnell = (
         f"https://api.cloudflare.com/client/v4/accounts/{account_id}"
@@ -247,55 +145,91 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
                 print("  [Cloudflare] cupo diario agotado — se salta el resto de la ejecución")
                 _cloudflare_agotado[0] = True
     except requests.RequestException as e:
-        print(f"  [Cloudflare] fallo de red: {e}")
+        print(f"  [Cloudflare/flux-1-schnell] fallo de red: {e}")
     return False
 
 
-NEGATIVE_PROMPT = (
-    "text, letters, words, numbers, labels, typography, writing, caption, "
-    "gibberish text, fake english, watermark, logo, signature, "
-    "multiple panels, diagram, mind map, connected boxes, flowchart, "
-    "comparison cards, dashboard, checklist, business presentation, "
-    "powerpoint slide, corporate template, infographic chart, "
-    "crowd of people, multiple people, low quality, blurry, distorted, "
-    "cute, childish, playful, cartoon, clipart, beige background, "
-    "white background, light background, bright colors, human resources style"
-)
+def _claves_gemini_disponibles() -> list:
+    claves = []
+    for nombre in ("GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3"):
+        valor = os.environ.get(nombre)
+        if valor:
+            claves.append((nombre, valor))
+    return [c for c in claves if c[0] not in _gemini_claves_agotadas]
 
 
-def _intentar_modelslab(prompt_completo: str, ruta_salida: str) -> bool:
-    api_key = os.environ.get("MODELSLAB_API_KEY")
-    if not api_key:
-        print("  [ModelsLab] falta MODELSLAB_API_KEY, se salta este proveedor")
+def _intentar_gemini(prompt_completo: str, ruta_salida: str) -> bool:
+    claves = _claves_gemini_disponibles()
+    if not claves:
+        if not any(os.environ.get(n) for n in ("GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3")):
+            print("  [Nano Banana] falta GEMINI_API_KEY, se salta este proveedor")
+        else:
+            print("  [Nano Banana] todas las claves configuradas se agotaron hoy, se salta este proveedor")
         return False
 
-    url = "https://modelslab.com/api/v6/realtime/text2img"
-    payload = {
-        "key": api_key,
-        "prompt": prompt_completo,
-        "negative_prompt": NEGATIVE_PROMPT,
-        "width": "1024",
-        "height": "576",
-        "samples": "1",
-        "safety_checker": False,
-    }
+    espera_necesaria = GEMINI_ESPACIADO_SEGUNDOS - (time.time() - _ultima_llamada_gemini[0])
+    if espera_necesaria > 0:
+        time.sleep(espera_necesaria)
+    _ultima_llamada_gemini[0] = time.time()
+
+    payload = {"contents": [{"parts": [{"text": prompt_completo}]}]}
+    modelos = ["gemini-3.1-flash-lite-image", "gemini-3.1-flash-image"]
+
+    for nombre_clave, api_key in claves:
+        headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
+        for modelo in modelos:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
+            try:
+                resp = requests.post(url, headers=headers, json=payload, timeout=TIMEOUT)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    partes = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                    for parte in partes:
+                        inline = parte.get("inlineData") or parte.get("inline_data")
+                        if inline and inline.get("data"):
+                            with open(ruta_salida, "wb") as f:
+                                f.write(base64.b64decode(inline["data"]))
+                            return _validar_imagen(ruta_salida)
+                    print(f"  [Nano Banana/{nombre_clave}/{modelo}] respuesta sin imagen: {resp.text[:200]}")
+                elif resp.status_code == 429:
+                    print(f"  [Nano Banana/{nombre_clave}] límite alcanzado, "
+                          f"pasando a la siguiente clave si hay: {resp.text[:120]}")
+                    _gemini_claves_agotadas.add(nombre_clave)
+                    break
+                elif resp.status_code == 404:
+                    print(f"  [Nano Banana/{nombre_clave}/{modelo}] modelo no encontrado (404), probando el siguiente...")
+                    continue
+                else:
+                    print(f"  [Nano Banana/{nombre_clave}/{modelo}] respuesta {resp.status_code}: {resp.text[:200]}")
+            except requests.RequestException as e:
+                print(f"  [Nano Banana/{nombre_clave}/{modelo}] fallo de red: {e}")
+    return False
+
+
+def _intentar_gradio(prompt_completo: str, ruta_salida: str) -> bool:
     try:
-        resp = requests.post(url, json=payload, timeout=TIMEOUT)
-        if resp.status_code == 200:
-            data = resp.json()
-            urls = data.get("output") or []
-            if urls:
-                img_resp = requests.get(urls[0], timeout=TIMEOUT)
-                if img_resp.status_code == 200:
-                    with open(ruta_salida, "wb") as f:
-                        f.write(img_resp.content)
-                    return _validar_imagen(ruta_salida)
-            else:
-                print(f"  [ModelsLab] sin imagen en la respuesta: {resp.text[:200]}")
-        else:
-            print(f"  [ModelsLab] respuesta {resp.status_code}: {resp.text[:200]}")
-    except requests.RequestException as e:
-        print(f"  [ModelsLab] fallo de red: {e}")
+        from gradio_client import Client
+    except ImportError:
+        print("  [Gradio] falta la librería gradio_client, se salta este proveedor")
+        return False
+
+    espacios_publicos = [
+        {"nombre": "black-forest-labs/FLUX.1-schnell", "kwargs": {"prompt": prompt_completo}},
+        {"nombre": "stabilityai/stable-diffusion-3.5-large-turbo",
+         "kwargs": {"prompt": prompt_completo, "negative_prompt": "", "seed": 0, "randomize_seed": True}},
+    ]
+    for espacio in espacios_publicos:
+        try:
+            cliente = Client(espacio["nombre"], download_files=True)
+            resultado = cliente.predict(**espacio["kwargs"], api_name="/infer")
+            ruta_resultado = resultado[0] if isinstance(resultado, (list, tuple)) else resultado
+            if isinstance(ruta_resultado, str) and os.path.exists(ruta_resultado):
+                import shutil
+                shutil.copy(ruta_resultado, ruta_salida)
+                if _validar_imagen(ruta_salida):
+                    return True
+        except Exception as e:
+            print(f"  [Gradio/{espacio['nombre']}] fallo: {str(e)[:150]}")
     return False
 
 
@@ -324,49 +258,14 @@ def _intentar_huggingface(prompt_completo: str, ruta_salida: str) -> bool:
     return False
 
 
-def _intentar_gradio(prompt_completo: str, ruta_salida: str) -> bool:
-    # Hugging Face Spaces públicos con Gradio (demos gratis, sin API key).
-    # AVISO: menos fiable que Cloudflare/ModelsLab — dependen de que el
-    # Space esté encendido y sin cola en ese momento. Es una capa extra
-    # de reserva, no algo con lo que contar como principal.
-    try:
-        from gradio_client import Client
-    except ImportError:
-        print("  [Gradio] falta la librería gradio_client, se salta este proveedor")
-        return False
-
-    # Cada Space público tiene su propia firma de argumentos — la
-    # llamada "genérica" (solo el prompt) no vale para todos.
-    espacios_publicos = [
-        {"nombre": "black-forest-labs/FLUX.1-schnell", "kwargs": {"prompt": prompt_completo}},
-        {"nombre": "stabilityai/stable-diffusion-3.5-large-turbo",
-         "kwargs": {"prompt": prompt_completo, "negative_prompt": "", "seed": 0, "randomize_seed": True}},
-    ]
-    for espacio in espacios_publicos:
-        try:
-            cliente = Client(espacio["nombre"], download_files=True)
-            resultado = cliente.predict(**espacio["kwargs"], api_name="/infer")
-            ruta_resultado = resultado[0] if isinstance(resultado, (list, tuple)) else resultado
-            if isinstance(ruta_resultado, str) and os.path.exists(ruta_resultado):
-                import shutil
-                shutil.copy(ruta_resultado, ruta_salida)
-                if _validar_imagen(ruta_salida):
-                    return True
-        except Exception as e:
-            print(f"  [Gradio/{espacio['nombre']}] fallo: {str(e)[:150]}")
-    return False
-
-
-def _generar_imagen_emergencia(ruta_salida: str) -> bool:
-    """Última red de seguridad absoluta: si los 4 proveedores de IA fallan
-    a la vez (como pasó el 19/09 al agotar todo el cupo gratis del día en
-    pruebas), generamos localmente una tarjeta de marca simple con FFmpeg
-    —sin depender de ninguna API— para que el vídeo se complete igual,
-    en vez de morir del todo."""
+def _generar_imagen_emergencia(ruta_salida: str, semilla: int = 0) -> bool:
     import subprocess
+    colores_fondo = ["0x1B2A4A", "0x2B2B2B"]
+    color_fondo = colores_fondo[semilla % len(colores_fondo)]
+    margen = 50 + (semilla % 5) * 15
     filtro = (
-        f"color=c=0x1B2A4A:s=1024x576:d=1,"
-        f"drawbox=x=50:y=50:w=924:h=476:color=0xC1502E@1.0:t=4"
+        f"color=c={color_fondo}:s=1024x576:d=1,"
+        f"drawbox=x={margen}:y={margen}:w={1024-2*margen}:h={576-2*margen}:color=0xC1502E@1.0:t=4"
     )
     comando = ["ffmpeg", "-y", "-f", "lavfi", "-i", filtro, "-frames:v", "1", ruta_salida]
     resultado = subprocess.run(comando, capture_output=True, text=True)
@@ -375,15 +274,13 @@ def _generar_imagen_emergencia(ruta_salida: str) -> bool:
 
 def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) -> bool:
     """
-    Genera una imagen para una escena, con fallback en cascada:
-    Cloudflare (principal) → Nano Banana (bonus) →
-    Gradio/HF Spaces (bonus) → Hugging Face directo (último recurso).
-    ModelsLab quitado: su endpoint "realtime" en realidad exige plan de
-    pago ("You need to be subscribed to a plan..."), no es gratis como
-    se pensaba — se deja la función por si algún día se activa con otro
-    plan, pero no se llama en la cascada para no perder tiempo en vano.
+    ARREGLO CLAVE: el SUJETO (prompt_escena) va PRIMERO en el prompt
+    final, y el estilo (corto) va DESPUÉS — al revés de como estaba antes,
+    que ponía un bloque de estilo larguísimo por delante y hacía que el
+    modelo ignorase el sujeto real, produciendo tarjetas vacías.
     """
-    prompt_completo = f"{ESTILO_BASE}, {_limpiar_prompt(prompt_escena)}"
+    sujeto = _limpiar_prompt(prompt_escena)
+    prompt_completo = f"{sujeto}, {ESTILO_BASE}"
 
     print("  Intentando con Cloudflare Workers AI...")
     if _intentar_cloudflare(prompt_completo, ruta_salida):
@@ -406,7 +303,7 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) ->
         return True
 
     print("  Los 4 proveedores de IA fallaron — usando tarjeta de marca de emergencia (sin IA)...")
-    if _generar_imagen_emergencia(ruta_salida):
+    if _generar_imagen_emergencia(ruta_salida, semilla=hash(prompt_escena) % 1000):
         print("  ✓ Imagen de emergencia generada (el vídeo se completa igual)")
         return True
 
