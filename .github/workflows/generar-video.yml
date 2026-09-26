@@ -31,13 +31,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: proyecto
-          # PIPELINE_VERSION: súbela cada vez que cambiemos algo que afecte
-          # a la calidad de las imágenes/estilo (proveedor, prompts, etc.)
-          # para que la caché vieja se invalide sola y no se reutilicen
-          # imágenes generadas con una versión anterior peor del pipeline.
-          key: ultima-senal-v4-${{ inputs.titulo }}-${{ github.run_id }}
+          key: ultima-senal-v5-${{ inputs.titulo }}-${{ github.run_id }}
           restore-keys: |
-            ultima-senal-v4-${{ inputs.titulo }}-
+            ultima-senal-v5-${{ inputs.titulo }}-
 
       - name: Ejecutar pipeline completo
         env:
@@ -45,7 +41,6 @@ jobs:
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
-          MODELSLAB_API_KEY: ${{ secrets.MODELSLAB_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
         run: python pipeline_auto.py "${{ inputs.titulo }}"
