@@ -272,6 +272,16 @@ def _generar_imagen_emergencia(ruta_salida: str, semilla: int = 0) -> bool:
     return resultado.returncode == 0 and os.path.exists(ruta_salida)
 
 
+_ultima_fue_emergencia = [False]
+
+
+def fue_ultima_generacion_emergencia() -> bool:
+    """El pipeline llama a esto justo después de generar_imagen() para saber
+    si el resultado fue la tarjeta de emergencia (y así marcarla para que
+    se reintente en el futuro en vez de quedarse pegada para siempre)."""
+    return _ultima_fue_emergencia[0]
+
+
 def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) -> bool:
     """
     ARREGLO CLAVE: el SUJETO (prompt_escena) va PRIMERO en el prompt
@@ -281,11 +291,16 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) ->
     """
     sujeto = _limpiar_prompt(prompt_escena)
     prompt_completo = f"{sujeto}, {ESTILO_BASE}"
+    _ultima_fue_emergencia[0] = False
 
     print("  Intentando con Cloudflare Workers AI...")
-    if _intentar_cloudflare(prompt_completo, ruta_salida):
-        print("  ✓ Imagen válida generada con Cloudflare")
-        return True
+    for intento_cf in range(2):
+        if _intentar_cloudflare(prompt_completo, ruta_salida):
+            print("  ✓ Imagen válida generada con Cloudflare")
+            return True
+        if intento_cf == 0:
+            print("  Cloudflare falló, reintentando una vez más...")
+            time.sleep(3)
 
     print("  Cloudflare falló, probando Nano Banana (Gemini)...")
     if _intentar_gemini(prompt_completo, ruta_salida):
@@ -305,6 +320,7 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) ->
     print("  Los 4 proveedores de IA fallaron — usando tarjeta de marca de emergencia (sin IA)...")
     if _generar_imagen_emergencia(ruta_salida, semilla=hash(prompt_escena) % 1000):
         print("  ✓ Imagen de emergencia generada (el vídeo se completa igual)")
+        _ultima_fue_emergencia[0] = True
         return True
 
     print(f"  ✗ FALLO TOTAL generando imagen para: {prompt_escena[:60]}...")
