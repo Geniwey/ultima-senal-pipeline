@@ -1,11 +1,6 @@
 """
-Última Señal — Animación Ken Burns (FFmpeg zoompan)
-======================================================
-Convierte cada imagen fija en un clip con zoom/paneo lento, con duración
-exacta igual al audio de esa escena (para que casen perfecto en el montaje).
-
-4 variantes de movimiento que van rotando, para que no se note repetitivo
-escena tras escena (mismo principio que ya usas en Box to Box FC).
+Última Señal — Animación Ken Burns + rótulo
+==============================================
 """
 
 import subprocess
@@ -14,65 +9,55 @@ import os
 FPS = 30
 ANCHO, ALTO = 1920, 1080
 
-# Variantes de movimiento: (dirección zoom, dirección paneo)
 VARIANTES = [
-    {"zoom_inicial": 1.0, "zoom_final": 1.15, "pan_x": "iw/2-(iw/zoom/2)", "pan_y": "ih/2-(ih/zoom/2)"},        # zoom-in centrado
-    {"zoom_inicial": 1.15, "zoom_final": 1.0, "pan_x": "iw/2-(iw/zoom/2)", "pan_y": "ih/2-(ih/zoom/2)"},        # zoom-out centrado
-    {"zoom_inicial": 1.05, "zoom_final": 1.2, "pan_x": "0", "pan_y": "ih/2-(ih/zoom/2)"},                        # zoom-in + pan derecha
-    {"zoom_inicial": 1.2, "zoom_final": 1.05, "pan_x": "iw-iw/zoom", "pan_y": "ih/2-(ih/zoom/2)"},               # zoom-out + pan izquierda
+    {"zoom_inicial": 1.0, "zoom_final": 1.15, "pan_x": "iw/2-(iw/zoom/2)", "pan_y": "ih/2-(ih/zoom/2)"},
+    {"zoom_inicial": 1.15, "zoom_final": 1.0, "pan_x": "iw/2-(iw/zoom/2)", "pan_y": "ih/2-(ih/zoom/2)"},
+    {"zoom_inicial": 1.05, "zoom_final": 1.2, "pan_x": "0", "pan_y": "ih/2-(ih/zoom/2)"},
+    {"zoom_inicial": 1.2, "zoom_final": 1.05, "pan_x": "iw-iw/zoom", "pan_y": "ih/2-(ih/zoom/2)"},
 ]
 
-
-COLOR_BARRA = "0x1B2A4A"   # navy de marca
-COLOR_ACENTO = "0xC1502E"  # naranja de marca
+COLOR_BARRA = "0x1B2A4A"
+COLOR_ACENTO = "0xC1502E"
 
 
 def animar_imagen(ruta_imagen: str, duracion_segundos: float, ruta_salida: str,
                    indice_variante: int, texto_pantalla: str = None):
     if os.path.exists(ruta_salida) and os.path.getsize(ruta_salida) > 10_000:
-        return ruta_salida  # ya generado (permite reanudar sin repetir trabajo)
+        return ruta_salida
 
     variante = VARIANTES[indice_variante % len(VARIANTES)]
     num_frames = max(int(duracion_segundos * FPS), FPS)
-
     z_ini, z_fin = variante["zoom_inicial"], variante["zoom_final"]
     incremento = (z_fin - z_ini) / num_frames
 
     filtro_normalizar = f"scale={ANCHO}:{ALTO}:force_original_aspect_ratio=increase,crop={ANCHO}:{ALTO}"
-
     filtro_zoompan = (
         f"{filtro_normalizar},"
         f"zoompan=z='{z_ini}+{incremento}*on':"
         f"x='{variante['pan_x']}':y='{variante['pan_y']}':"
         f"d={num_frames}:s={ANCHO}x{ALTO}:fps={FPS}"
     )
-
     filtros = [filtro_zoompan]
 
     if texto_pantalla:
         texto_seguro = (
             texto_pantalla.upper()
-            .replace("\\", "")
-            .replace(":", "")
-            .replace("'", "")
-            .replace('"', "")
+            .replace("\\", "").replace(":", "").replace("'", "").replace('"', "")
         )
-        # Posiciones en píxeles fijos (ANCHO/ALTO son constantes = 1920x1080):
-        # antes usábamos "h-160" dentro de un drawbox que TAMBIÉN tenía un
-        # parámetro propio "h=110" — ffmpeg confundía ambos "h" y la barra
-        # salía mal colocada. Con números fijos no hay ambigüedad posible.
-        barra_y = ALTO - 160      # 920
-        barra_alto = 110
-        texto_y = ALTO - 115      # 965
-        filtro_texto = (
-            f"drawbox=x=0:y={barra_y}:w=760:h={barra_alto}:color={COLOR_BARRA}@0.85:t=fill,"
-            f"drawbox=x=0:y={barra_y}:w=760:h=5:color={COLOR_ACENTO}@1.0:t=fill,"
-            f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize=46:"
-            f"font='DejaVu Sans Bold':borderw=2:bordercolor=black@0.6:"
-            f"x=50:y={texto_y}:"
+        # Rótulo grande, a todo el ancho de la mitad inferior, centrado,
+        # legible sin sonido y en móvil (antes era una barra pequeña de
+        # 760px a la izquierda con letra 46pt — demasiado discreta).
+        barra_y = ALTO - 190
+        barra_alto = 140
+        texto_y = ALTO - 145
+        filtros.append(
+            f"drawbox=x=0:y={barra_y}:w={ANCHO}:h={barra_alto}:color={COLOR_BARRA}@0.88:t=fill,"
+            f"drawbox=x=0:y={barra_y}:w={ANCHO}:h=6:color={COLOR_ACENTO}@1.0:t=fill,"
+            f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize=64:"
+            f"font='DejaVu Sans Bold':borderw=3:bordercolor=black@0.6:"
+            f"x=(w-text_w)/2:y={texto_y}:"
             f"alpha='if(lt(t,0.3),t/0.3,1)'"
         )
-        filtros.append(filtro_texto)
 
     comando = [
         "ffmpeg", "-y", "-loop", "1", "-i", ruta_imagen,
