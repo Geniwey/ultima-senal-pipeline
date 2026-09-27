@@ -1,10 +1,6 @@
 """
 Última Señal — Miniatura (thumbnail)
 =======================================
-Genera la imagen de portada en formato estándar de YouTube (1280x720) a
-partir de una imagen del vídeo QUE YA SE GENERÓ BIEN — no pide una imagen
-nueva a ningún proveedor, así nunca depende de que quede cupo libre justo
-al final de la ejecución.
 """
 
 import subprocess
@@ -22,13 +18,12 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
         titulo_corto.upper()
         .replace("\\", "").replace(":", "").replace("'", "").replace('"', "")
     )
-    # Marco de acento grueso alrededor de toda la miniatura (look "canal
-    # serio" tipo documental true-crime), viñeta oscura en los bordes para
-    # dar profundidad, degradado inferior más fuerte, y texto más grande
-    # con doble contorno — se aleja del aspecto plano de diapositiva.
-    # Círculo rojo de "atención" en una esquina — el clásico elemento de
-    # alto contraste de miniaturas de true-crime/investigación que dirige
-    # el ojo hacia el punto clave de la imagen.
+    # Tamaño de fuente dinámico según longitud del texto, para que NUNCA
+    # se salga del encuadre (antes usaba 112pt fijo y se cortaba en textos
+    # largos). Cálculo aproximado: ancho útil 1180px, ~0.6*fontsize por letra.
+    ancho_util = 1180
+    fontsize = min(112, max(50, int(ancho_util / (len(texto_seguro) * 0.58))))
+
     cx, cy, radio = 1120, 140, 70
     circulo = (
         f"drawbox=x={cx-radio}:y={cy-6}:w={radio*2}:h=12:color=red@0.95:t=fill,"
@@ -45,9 +40,9 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
         "drawbox=x=0:y=600:w=1280:h=40:color=black@0.60:t=fill,"
         "drawbox=x=0:y=640:w=1280:h=80:color=black@0.78:t=fill,"
         f"drawbox=x=0:y=690:w=1280:h=10:color={COLOR_ACENTO}@1.0:t=fill,"
-        f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize=112:"
-        f"font='DejaVu Sans Bold':borderw=10:bordercolor=black@1.0:"
-        "x=(w-text_w)/2:y=h-225,"
+        f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize={fontsize}:"
+        f"font='DejaVu Sans Bold':borderw=8:bordercolor=black@1.0:"
+        "x=(w-text_w)/2:y=h-(text_h+90),"
         f"drawbox=x=0:y=0:w=1280:h=14:color={COLOR_BORDE}@1.0:t=fill,"
         f"drawbox=x=0:y=706:w=1280:h=14:color={COLOR_BORDE}@1.0:t=fill,"
         f"drawbox=x=0:y=0:w=14:h=720:color={COLOR_BORDE}@1.0:t=fill,"
