@@ -1,10 +1,6 @@
 """
 Última Señal — Pipeline automático de principio a fin
 =========================================================
-Igual que pipeline.py pero sin pausa interactiva (para correr en GitHub
-Actions, donde nadie puede teclear una respuesta). La revisión humana se
-hace al final, sobre el vídeo terminado, antes de subirlo a YouTube.
-
 Uso:
     python pipeline_auto.py "Tema del accidente aéreo"
 """
@@ -15,7 +11,7 @@ import json
 import time
 
 from generar_guion import generar_guion
-from generar_imagen import generar_imagen
+from generar_imagen import generar_imagen, fue_ultima_generacion_emergencia
 from generar_voz import generar_voces
 from animar_imagen import animar_todas
 from montar_video import montar_video_final
@@ -25,7 +21,6 @@ from generar_miniatura import generar_miniatura_desde_imagen
 def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
     os.makedirs(carpeta_proyecto, exist_ok=True)
 
-    # 1. GUION
     print("\n=== 1/6: Guion ===")
     ruta_guion = os.path.join(carpeta_proyecto, "guion.json")
     guion = generar_guion(tema)
@@ -33,12 +28,10 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
         json.dump(guion, f, ensure_ascii=False, indent=2)
     print(f"Título: {guion['titulo_video']} | {len(guion['escenas'])} escenas")
 
-    # 2. VOZ (primero, para saber duración exacta de cada escena)
     print("\n=== 2/6: Voz ===")
     carpeta_audio = os.path.join(carpeta_proyecto, "audio")
     info_escenas = generar_voces(ruta_guion, carpeta_audio)
 
-    # 3. IMÁGENES
     print("\n=== 3/6: Imágenes ===")
     carpeta_imagenes = os.path.join(carpeta_proyecto, "imagenes")
     os.makedirs(carpeta_imagenes, exist_ok=True)
@@ -47,48 +40,44 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
         fallidas = []
         for escena in lista_escenas:
             ruta_img = os.path.join(carpeta_imagenes, f"escena_{escena['indice']:02d}.png")
-            if os.path.exists(ruta_img) and os.path.getsize(ruta_img) > 10_000:
-                continue  # ya generada en un intento/ejecución anterior
+            ruta_marca = ruta_img + ".emergencia"
+            # Si ya existe una imagen REAL (no marcada como emergencia), la
+            # saltamos. Si está marcada como emergencia, SIEMPRE se reintenta,
+            # aunque el archivo ya exista — así nunca se queda pegada.
+            if (os.path.exists(ruta_img) and os.path.getsize(ruta_img) > 10_000
+                    and not os.path.exists(ruta_marca)):
+                continue
             print(f"  Escena {escena['indice']}/{len(info_escenas)}")
-            if not generar_imagen(escena["prompt_imagen"], ruta_img):
+            ok = generar_imagen(escena["prompt_imagen"], ruta_img)
+            if not ok:
                 fallidas.append(escena)
+            elif fue_ultima_generacion_emergencia():
+                open(ruta_marca, "w").close()
+            elif os.path.exists(ruta_marca):
+                os.remove(ruta_marca)
         return fallidas
 
     fallidas = _generar_todas(info_escenas)
-
     if fallidas:
-        print(f"\n⚠ {len(fallidas)} escenas fallaron en la primera pasada. "
-              f"Esperando 90s antes de reintentar (para que se liberen los límites de los proveedores)...")
+        print(f"\n⚠ {len(fallidas)} escenas fallaron. Esperando 90s antes de reintentar...")
         time.sleep(90)
         fallidas = _generar_todas(fallidas)
-
     if fallidas:
         indices = [e["indice"] for e in fallidas]
-        raise RuntimeError(f"Fallaron las imágenes de las escenas {indices} tras agotar los 3 proveedores, dos pasadas")
+        raise RuntimeError(f"Fallaron las imágenes de las escenas {indices} tras dos pasadas")
 
-    # 4. ANIMACIÓN
     print("\n=== 4/6: Animación (Ken Burns) ===")
     carpeta_clips = os.path.join(carpeta_proyecto, "clips")
     animar_todas(info_escenas, carpeta_imagenes, carpeta_clips)
 
-    # 5. MONTAJE FINAL
-    # (ya no generamos subtítulos completos con Whisper — se quedaba
-    # solapado con el titular corto en pantalla, duplicando el texto.
-    # El titular ya cumple esa función de forma más limpia)
     print("\n=== 5/5: Montaje final ===")
     ruta_final = os.path.join(carpeta_proyecto, "video_final.mp4")
     info_escenas_path = os.path.join(carpeta_audio, "info_escenas.json")
     montar_video_final(carpeta_clips, carpeta_audio, ruta_final, info_escenas_path)
 
-    # Archivo con todo lo necesario para subir el vídeo a YouTube sin
-    # tener que escribir nada a mano: título, descripción, tags y capítulos.
     ruta_metadata = os.path.join(carpeta_proyecto, "metadata_youtube.txt")
-
-    # Capítulos automáticos: repartimos ~7 puntos a lo largo del guion,
-    # usando el titular en pantalla de esa escena y su tiempo acumulado
-    # (empezando en 0:00 con el intro de 3s ya sumado).
     capitulos = []
-    tiempo_acumulado = 3.0  # el bumper de intro dura 3s
+    tiempo_acumulado = 3.0
     total_escenas = len(info_escenas)
     paso = max(total_escenas // 7, 1)
     for i, escena in enumerate(info_escenas):
@@ -112,19 +101,13 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
         f.write(guion.get("comentario_fijado", "") + "\n")
     print(f"✓ Metadata de YouTube guardada en {ruta_metadata}")
 
-    # Miniatura: reutilizamos una imagen que YA generamos bien para el
-    # vídeo (aprox. dos tercios del guion) en vez de pedir una nueva — así
-    # no depende de que quede cupo libre justo al final, cuando ya hemos
-    # gastado el de las 90-100 imágenes del vídeo.
-    print("\nGenerando miniatura (a partir de una imagen ya generada)...")
+    print("\nGenerando miniatura...")
     indice_miniatura = info_escenas[int(len(info_escenas) * 0.65)]["indice"]
     ruta_imagen_base = os.path.join(carpeta_imagenes, f"escena_{indice_miniatura:02d}.png")
     ruta_miniatura = os.path.join(carpeta_proyecto, "miniatura.png")
     try:
         generar_miniatura_desde_imagen(
-            ruta_imagen_base,
-            guion.get("titulo_video", "")[:40],
-            ruta_miniatura,
+            ruta_imagen_base, guion.get("titulo_video", "")[:40], ruta_miniatura,
         )
         print(f"✓ Miniatura guardada en {ruta_miniatura}")
     except Exception as e:
