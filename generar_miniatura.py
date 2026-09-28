@@ -1,7 +1,4 @@
-"""
-Última Señal — Miniatura (thumbnail)
-=======================================
-"""
+"""Última Señal — Miniatura (thumbnail)"""
 
 import subprocess
 import os
@@ -15,14 +12,11 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
         raise RuntimeError(f"No existe la imagen base para la miniatura: {ruta_imagen_base}")
 
     texto_seguro = (
-        titulo_corto.upper()
+        titulo_corto[:26].upper()
         .replace("\\", "").replace(":", "").replace("'", "").replace('"', "")
     )
-    # Tamaño de fuente dinámico según longitud del texto, para que NUNCA
-    # se salga del encuadre (antes usaba 112pt fijo y se cortaba en textos
-    # largos). Cálculo aproximado: ancho útil 1180px, ~0.6*fontsize por letra.
-    ancho_util = 1180
-    fontsize = min(112, max(50, int(ancho_util / (len(texto_seguro) * 0.58))))
+    ancho_util = 1160
+    fontsize = min(90, max(40, int(ancho_util / (max(len(texto_seguro), 1) * 0.68))))
 
     cx, cy, radio = 1120, 140, 70
     circulo = (
