@@ -36,6 +36,21 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
     carpeta_imagenes = os.path.join(carpeta_proyecto, "imagenes")
     os.makedirs(carpeta_imagenes, exist_ok=True)
 
+    # Imagen dedicada de la miniatura: se genera PRIMERO (antes de gastar
+    # cupo en las escenas) con un prompt específico de la causa del caso.
+    ruta_base_miniatura = os.path.join(carpeta_imagenes, "miniatura_base.png")
+    miniatura_ok = False
+    if guion.get("prompt_miniatura"):
+        if os.path.exists(ruta_base_miniatura) and not os.path.exists(ruta_base_miniatura + ".emergencia"):
+            miniatura_ok = True
+        else:
+            print("  Generando imagen dedicada de la miniatura...")
+            if generar_imagen(guion["prompt_miniatura"], ruta_base_miniatura):
+                if fue_ultima_generacion_emergencia():
+                    open(ruta_base_miniatura + ".emergencia", "w").close()
+                else:
+                    miniatura_ok = True
+
     def _generar_todas(lista_escenas):
         fallidas = []
         for escena in lista_escenas:
@@ -102,13 +117,23 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
     print(f"✓ Metadata de YouTube guardada en {ruta_metadata}")
 
     print("\nGenerando miniatura...")
-    indice_miniatura = info_escenas[int(len(info_escenas) * 0.65)]["indice"]
-    ruta_imagen_base = os.path.join(carpeta_imagenes, f"escena_{indice_miniatura:02d}.png")
+    ruta_imagen_base = ruta_base_miniatura
+    if not miniatura_ok:
+        # Fallback: primera escena con imagen REAL (no tarjeta de
+        # emergencia), no un índice fijo que podría ser emergencia también.
+        ruta_imagen_base = None
+        for escena in info_escenas:
+            candidata = os.path.join(carpeta_imagenes, f"escena_{escena['indice']:02d}.png")
+            if os.path.exists(candidata) and not os.path.exists(candidata + ".emergencia"):
+                ruta_imagen_base = candidata
+                break
+        if ruta_imagen_base is None:
+            indice_miniatura = info_escenas[int(len(info_escenas) * 0.65)]["indice"]
+            ruta_imagen_base = os.path.join(carpeta_imagenes, f"escena_{indice_miniatura:02d}.png")
     ruta_miniatura = os.path.join(carpeta_proyecto, "miniatura.png")
+    texto_miniatura = guion.get("titulo_miniatura") or guion.get("titulo_video", "")
     try:
-        generar_miniatura_desde_imagen(
-            ruta_imagen_base, guion.get("titulo_video", "")[:40], ruta_miniatura,
-        )
+        generar_miniatura_desde_imagen(ruta_imagen_base, texto_miniatura, ruta_miniatura)
         print(f"✓ Miniatura guardada en {ruta_miniatura}")
     except Exception as e:
         print(f"  ⚠ No se pudo generar la miniatura: {e}")
