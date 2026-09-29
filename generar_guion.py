@@ -33,6 +33,8 @@ Devuelve SOLO un JSON válido, sin texto adicional, con esta forma exacta:
   "descripcion_youtube": "descripción de 3-4 párrafos para YouTube",
   "tags_youtube": ["10 a 15 tags cortos en español"],
   "comentario_fijado": "una pregunta polarizante/de debate para fijar en comentarios",
+  "prompt_miniatura": "descripción en inglés de UN solo objeto que represente la causa/misterio central del caso (ej. roll of adhesive tape covering an airplane sensor), sin texto",
+  "titulo_miniatura": "2-4 palabras MAYÚSCULAS de máximo impacto para la miniatura (ej. UN TROZO DE CINTA)",
   "escenas": [
     {
       "texto_narracion": "frase corta, 8-15 palabras, 3-5 segundos de voz",
