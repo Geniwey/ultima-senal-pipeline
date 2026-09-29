@@ -10,8 +10,8 @@ FPS = 30
 ANCHO, ALTO = 1920, 1080
 
 VARIANTES = [
-    {"zoom_inicial": 1.0, "zoom_final": 1.15, "pan_x": "iw/2-(iw/zoom/2)", "pan_y": "ih/2-(ih/zoom/2)"},
-    {"zoom_inicial": 1.15, "zoom_final": 1.0, "pan_x": "iw/2-(iw/zoom/2)", "pan_y": "ih/2-(ih/zoom/2)"},
+    {"zoom_inicial": 1.0, "zoom_final": 1.15, "pan_x": "iw/2-(iw/zoom/2)+10*sin(on/9)", "pan_y": "ih/2-(ih/zoom/2)+6*cos(on/11)"},
+    {"zoom_inicial": 1.15, "zoom_final": 1.0, "pan_x": "iw/2-(iw/zoom/2)+10*sin(on/9)", "pan_y": "ih/2-(ih/zoom/2)+6*cos(on/11)"},
     {"zoom_inicial": 1.05, "zoom_final": 1.2, "pan_x": "0", "pan_y": "ih/2-(ih/zoom/2)"},
     {"zoom_inicial": 1.2, "zoom_final": 1.05, "pan_x": "iw-iw/zoom", "pan_y": "ih/2-(ih/zoom/2)"},
 ]
@@ -37,7 +37,9 @@ def animar_imagen(ruta_imagen: str, duracion_segundos: float, ruta_salida: str,
         f"x='{variante['pan_x']}':y='{variante['pan_y']}':"
         f"d={num_frames}:s={ANCHO}x{ALTO}:fps={FPS}"
     )
-    filtros = [filtro_zoompan]
+    # Grano de película + viñeta: unifica el look y quita el aspecto de
+    # icono plano/clip-art, dando textura cinematográfica.
+    filtros = [filtro_zoompan, "noise=alls=14:allf=t", "vignette=angle=PI/5"]
 
     if texto_pantalla:
         texto_seguro = (
