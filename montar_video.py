@@ -1,11 +1,4 @@
-"""
-Última Señal — Montaje final
-===============================
-Une los clips animados en orden, concatena todos los audios de voz,
-sincroniza y exporta el vídeo final listo para subir. El texto en pantalla
-ya viene quemado en cada clip (paso de animación) como titular corto —
-no se añaden subtítulos completos aparte, para no duplicar el texto.
-"""
+"""Última Señal — Montaje final"""
 
 import subprocess
 import os
@@ -29,9 +22,7 @@ def _concatenar_audios(rutas_audio: list, ruta_salida: str):
     with open(lista_txt, "w", encoding="utf-8") as f:
         for ruta in rutas_audio:
             f.write(f"file '{os.path.abspath(ruta)}'\n")
-
-    comando = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", lista_txt,
-               "-c", "copy", ruta_salida]
+    comando = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", lista_txt, "-c", "copy", ruta_salida]
     resultado = subprocess.run(comando, capture_output=True, text=True)
     os.remove(lista_txt)
     if resultado.returncode != 0:
@@ -43,9 +34,7 @@ def _concatenar_video(rutas_clips: list, ruta_salida: str):
     with open(lista_txt, "w", encoding="utf-8") as f:
         for ruta in rutas_clips:
             f.write(f"file '{os.path.abspath(ruta)}'\n")
-
-    comando = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", lista_txt,
-               "-c", "copy", ruta_salida]
+    comando = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", lista_txt, "-c", "copy", ruta_salida]
     resultado = subprocess.run(comando, capture_output=True, text=True)
     os.remove(lista_txt)
     if resultado.returncode != 0:
@@ -75,8 +64,8 @@ def montar_video_final(carpeta_clips: str, carpeta_audios: str,
     generar_intro(ruta_intro)
     ruta_outro = ruta_salida + "_outro_temp.mp4"
     generar_outro(ruta_outro)
-    ruta_intro_silencio = ruta_salida + "_intro_alarma_temp.mp3"
-    generar_alarma_intro(ruta_intro_silencio, 3)
+    ruta_intro_alarma = ruta_salida + "_intro_alarma_temp.mp3"
+    generar_alarma_intro(ruta_intro_alarma, 3)
     ruta_outro_silencio = ruta_salida + "_outro_silencio_temp.mp3"
     _generar_silencio(ruta_outro_silencio, 3)
 
@@ -84,18 +73,18 @@ def montar_video_final(carpeta_clips: str, carpeta_audios: str,
     video_temp = ruta_salida + "_video_temp.mp4"
     _concatenar_video([ruta_intro] + rutas_clips + [ruta_outro], video_temp)
 
-    print("Concatenando audio (silencio + voces + silencio)...")
+    print("Concatenando audio...")
     audio_temp = ruta_salida + "_audio_temp.mp3"
-    _concatenar_audios([ruta_intro_silencio] + rutas_audios + [ruta_outro_silencio], audio_temp)
+    _concatenar_audios([ruta_intro_alarma] + rutas_audios + [ruta_outro_silencio], audio_temp)
 
-    print("Añadiendo ambiente sonoro de fondo...")
+    print("Añadiendo ambiente sonoro (auto-ducking)...")
     duracion_total = _duracion_audio(audio_temp)
     ruta_ambiente = ruta_salida + "_ambiente_temp.mp3"
     generar_ambiente(ruta_ambiente, duracion_total)
     audio_con_ambiente = ruta_salida + "_audio_con_ambiente_temp.mp3"
     mezclar_con_narracion(audio_temp, ruta_ambiente, audio_con_ambiente)
 
-    print("Uniendo audio + vídeo, normalizando volumen al estándar de YouTube...")
+    print("Uniendo audio + vídeo, normalizando volumen...")
     comando = [
         "ffmpeg", "-y", "-i", video_temp, "-i", audio_con_ambiente,
         "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
@@ -105,7 +94,6 @@ def montar_video_final(carpeta_clips: str, carpeta_audios: str,
         "-shortest",
         ruta_salida,
     ]
-
     resultado = None
     for intento in range(2):
         resultado = subprocess.run(comando, capture_output=True, text=True)
@@ -113,14 +101,10 @@ def montar_video_final(carpeta_clips: str, carpeta_audios: str,
             break
         print(f"  ⚠ Fallo en el montaje final (intento {intento+1}/2), reintentando...")
 
-    os.remove(video_temp)
-    os.remove(audio_temp)
-    os.remove(ruta_intro)
-    os.remove(ruta_outro)
-    os.remove(ruta_intro_silencio)
-    os.remove(ruta_outro_silencio)
-    os.remove(ruta_ambiente)
-    os.remove(audio_con_ambiente)
+    for temp in [video_temp, audio_temp, ruta_intro, ruta_outro,
+                 ruta_intro_alarma, ruta_outro_silencio, ruta_ambiente, audio_con_ambiente]:
+        if os.path.exists(temp):
+            os.remove(temp)
 
     if resultado.returncode != 0 or not os.path.exists(ruta_salida):
         raise RuntimeError(f"Fallo en el montaje final tras 2 intentos:\n{resultado.stderr[-1000:]}")
