@@ -1,33 +1,23 @@
-"""
-Última Señal — Generación de voz (Edge TTS, gratis)
-======================================================
-Convierte cada escena del guion en audio, y devuelve también la duración
-de cada clip para poder sincronizar las imágenes después.
-
-Requiere:
-    pip install edge-tts
-"""
+"""Última Señal — Voz (Edge TTS)"""
 
 import asyncio
 import json
 import os
 import sys
 import subprocess
+import time
 
 VOZ = "es-ES-AlvaroNeural"
 
 
 def _perfil_para_posicion(indice: int, total: int) -> tuple:
-    """Varía ritmo/tono según la posición en el guion, para que no suene
-    monótono todo el vídeo igual — más urgencia en el gancho, más
-    gravedad/pausa en el punto álgido."""
     posicion = indice / max(total, 1)
     if posicion <= 0.08:
-        return "+2%", "+0Hz"       # gancho inicial: algo más vivo/urgente
+        return "+2%", "+0Hz"
     elif 0.70 <= posicion <= 0.88:
-        return "-14%", "-4Hz"      # punto álgido: más lento y grave, dramatismo
+        return "-14%", "-4Hz"
     else:
-        return "-6%", "-1Hz"       # resto: ritmo pausado estándar
+        return "-6%", "-1Hz"
 
 
 async def _generar_audio_escena(texto: str, ruta_salida: str, velocidad: str, tono: str):
@@ -46,8 +36,6 @@ def _duracion_audio(ruta: str) -> float:
 
 
 def _es_punto_dramatico(indice: int, total: int) -> bool:
-    """La última escena del punto álgido (impacto/hallazgo) recibe una
-    pausa de silencio detrás — igual que un corte a negro dramático."""
     posicion = indice / max(total, 1)
     return 0.86 <= posicion <= 0.89
 
@@ -66,10 +54,6 @@ def _anadir_pausa(ruta_audio: str, segundos: float = 1.2):
 
 
 def _generar_silencio_por_defecto(ruta_salida: str, texto: str):
-    """Último recurso si Edge TTS falla varias veces para una escena: en
-    vez de tirar todo el vídeo abajo, generamos un silencio con duración
-    estimada por el largo del texto (~2.3 palabras/segundo hablando
-    pausado) para que esa escena tenga igualmente su hueco de tiempo."""
     palabras = max(len(texto.split()), 3)
     duracion = round(palabras / 2.3, 1)
     comando = [
@@ -100,17 +84,11 @@ def generar_voces(ruta_guion: str, carpeta_salida: str) -> list:
                     exito = True
             except Exception as e:
                 print(f"    fallo intento {intentos+1}: {e}")
-                import time
                 time.sleep(2)
             intentos += 1
 
         if not exito:
-            # Red de seguridad: no tiramos el vídeo entero por una sola
-            # escena — generamos un silencio de duración equivalente y
-            # seguimos. Se pierde la narración de esa frase, pero el
-            # vídeo se completa igualmente.
-            print(f"  ⚠ No se pudo generar voz para la escena {i} tras 4 intentos — "
-                  f"se usa un silencio de relleno para no interrumpir el vídeo")
+            print(f"  ⚠ No se pudo generar voz para la escena {i} — usando silencio de relleno")
             _generar_silencio_por_defecto(ruta_audio, escena["texto_narracion"])
 
         if _es_punto_dramatico(i, total_escenas):
