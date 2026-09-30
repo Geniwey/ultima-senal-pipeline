@@ -31,9 +31,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: proyecto
-          key: ultima-senal-v5-${{ inputs.titulo }}-${{ github.run_id }}
+          key: ultima-senal-v6-${{ inputs.titulo }}-${{ github.run_id }}
           restore-keys: |
-            ultima-senal-v5-${{ inputs.titulo }}-
+            ultima-senal-v6-${{ inputs.titulo }}-
 
       - name: Ejecutar pipeline completo
         env:
