@@ -1,20 +1,13 @@
-"""
-Última Señal — Bumper de marca (intro)
-=========================================
-Genera un clip de 3 segundos con el nombre del canal, en la paleta de
-colores de marca fija. Se antepone a cada vídeo para dar identidad
-reconocible — no depende de ningún proveedor de IA, así que nunca falla
-ni varía de un vídeo a otro.
-"""
+"""Última Señal — Bumper de marca (intro/outro)"""
 
 import subprocess
 import os
 
 ANCHO, ALTO = 1920, 1080
 DURACION = 3
-COLOR_FONDO = "0x1B2A4A"   # navy de marca
-COLOR_TITULO = "0xC1502E"  # naranja de marca
-COLOR_SUBTITULO = "0xE8E6DE"  # off-white de marca
+COLOR_FONDO = "0x1B2A4A"
+COLOR_TITULO = "0xC1502E"
+COLOR_SUBTITULO = "0xE8E6DE"
 
 
 def generar_intro(ruta_salida: str):
@@ -39,7 +32,6 @@ def generar_intro(ruta_salida: str):
 
 
 def generar_outro(ruta_salida: str):
-    """Cierre de marca (3s) con llamada a suscribirse, mismo estilo que el intro."""
     filtro = (
         f"color=c={COLOR_FONDO}:s={ANCHO}x{ALTO}:d={DURACION},"
         f"drawtext=text='ÚLTIMA SEÑAL':fontcolor={COLOR_TITULO}:fontsize=90:"
