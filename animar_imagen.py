@@ -39,7 +39,7 @@ def animar_imagen(ruta_imagen: str, duracion_segundos: float, ruta_salida: str,
     )
     # Grano de película + viñeta: unifica el look y quita el aspecto de
     # icono plano/clip-art, dando textura cinematográfica.
-    filtros = [filtro_zoompan, "noise=alls=14:allf=t", "vignette=angle=PI/5"]
+    filtros = [filtro_zoompan, "vignette=angle=PI/5"]  # noise quitado: disparaba el peso del vídeo a GBs
 
     if texto_pantalla:
         texto_seguro = (
