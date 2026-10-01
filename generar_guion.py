@@ -3,10 +3,10 @@ import json
 import sys
 from groq import Groq
 
-# Modelos ultra-estables de Groq que no dan error 404
-MODELO_PRINCIPAL = "llama3-70b-8192"
-MODELO_FALLBACK = "mixtral-8x7b-32768"
-MODELO_CEREBRAS = "llama-3.3-70b"
+# Modelos activos y verificados que no dan error 404 ni 400
+MODELO_PRINCIPAL = "llama-3.1-70b-versatile"
+MODELO_FALLBACK = "gemma2-9b-it"
+MODELO_CEREBRAS = "llama3.1-70b"
 
 SYSTEM_PROMPT = """Eres guionista de un canal de YouTube de documentales de investigación aérea estilo Thriller y True Crime.
 
