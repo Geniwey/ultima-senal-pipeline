@@ -1,13 +1,12 @@
-name: Generar Vídeo - Última Señal
-
+# Estructura estable para CI/CD[span_31](start_span)[span_31](end_span)[span_32](start_span)[span_32](end_span)
+name: Generar Video Última Señal
 on:
   workflow_dispatch:
     inputs:
       titulo:
-        description: "Título / tema del vídeo (ej: Vuelo 447 de Air France)"
+        description: "Título tema del vídeo (ej: Vuelo 447 de Air France)"
         required: true
         type: string
-
 jobs:
   generar-video:
     runs-on: ubuntu-latest
@@ -15,18 +14,18 @@ jobs:
     steps:
       - name: Checkout del repo
         uses: actions/checkout@v4
-
+        
       - name: Instalar Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
+          
       - name: Instalar FFmpeg
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
-
+        
       - name: Instalar dependencias Python
         run: pip install requests groq openai edge-tts gradio_client
-
+        
       - name: Recuperar progreso de intentos anteriores (mismo título)
         uses: actions/cache@v4
         with:
@@ -34,7 +33,7 @@ jobs:
           key: ultima-senal-v6-${{ inputs.titulo }}-${{ github.run_id }}
           restore-keys: |
             ultima-senal-v6-${{ inputs.titulo }}-
-
+            
       - name: Ejecutar pipeline completo
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -44,8 +43,8 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
         run: python pipeline_auto.py "${{ inputs.titulo }}"
-
-      - name: Subir vídeo final
+        
+      - name: Subir video final
         if: always()
         uses: actions/upload-artifact@v4
         with:
