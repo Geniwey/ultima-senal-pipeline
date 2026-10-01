@@ -1,14 +1,15 @@
-# Código optimizado con retención extrema y cliffhanger[span_0](start_span)[span_0](end_span)[span_1](start_span)[span_1](end_span)[span_2](start_span)[span_2](end_span)[span_3](start_span)[span_3](end_span)
 import os
 import json
 import sys
 from groq import Groq
 
-MODELO_PRINCIPAL = "llama-3.3-70b-versatile"
-MODELO_FALLBACK = "llama-3.1-8b-instant"
+# Modelos ultra-estables de Groq que no dan error 404
+MODELO_PRINCIPAL = "llama3-70b-8192"
+MODELO_FALLBACK = "mixtral-8x7b-32768"
 MODELO_CEREBRAS = "llama-3.3-70b"
 
 SYSTEM_PROMPT = """Eres guionista de un canal de YouTube de documentales de investigación aérea estilo Thriller y True Crime.
+
 Reglas estrictas:
 - Nunca describir restos humanos, cuerpos o imágenes gráficas.
 - Español neutro, apto para España y Latinoamérica. Tono grave, misterioso y cinematográfico.
@@ -33,6 +34,7 @@ Reglas estrictas:
     }
   ]
 }
+
 Cada escena debe durar entre 3.5 y 5.5 segundos. Genera entre 80 y 110 escenas para mantener un ritmo frenético."""
 
 def _llamar_groq(cliente: Groq, tema: str, modelo: str) -> str:
@@ -51,7 +53,8 @@ def _llamar_cerebras(tema: str) -> str:
     from openai import OpenAI
     api_key = os.environ.get("CEREBRAS_API_KEY")
     if not api_key:
-        raise RuntimeError("Falta CEREBRAS_API_KEY")
+        raise RuntimeError("Falta CEREBRAS_API_KEY en las variables de entorno")
+    
     cliente = OpenAI(api_key=api_key, base_url="https://api.cerebras.ai/v1")
     respuesta = cliente.chat.completions.create(
         model=MODELO_CEREBRAS,
@@ -67,13 +70,16 @@ def _llamar_cerebras(tema: str) -> str:
 def _limpiar_y_parsear(texto: str) -> dict:
     if not texto or not texto.strip():
         raise ValueError("Respuesta vacía del modelo")
+    
     texto = texto.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    return json.loads(texto)
+    datos = json.loads(texto)
+    return datos
 
 def generar_guion(tema: str) -> dict:
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
         raise RuntimeError("Falta la variable de entorno GROQ_API_KEY")
+    
     cliente = Groq(api_key=api_key)
     
     for modelo in (MODELO_PRINCIPAL, MODELO_FALLBACK):
@@ -103,8 +109,11 @@ if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("Uso: python generar_guion.py 'tema del accidente' salida.json")
         sys.exit(1)
+    
     tema_arg, salida_arg = sys.argv[1], sys.argv[2]
     guion = generar_guion(tema_arg)
+    
     with open(salida_arg, "w", encoding="utf-8") as f:
         json.dump(guion, f, ensure_ascii=False, indent=2)
+    
     print(f" Guion guardado en {salida_arg} ({len(guion['escenas'])} escenas)")
