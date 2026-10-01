@@ -3,10 +3,10 @@ import json
 import sys
 from groq import Groq
 
-# Modelos activos y verificados que no dan error 404 ni 400
-MODELO_PRINCIPAL = "llama-3.1-70b-versatile"
-MODELO_FALLBACK = "gemma2-9b-it"
-MODELO_CEREBRAS = "llama3.1-70b"
+# RESTAURADOS TUS MODELOS ORIGINALES EXACTOS (Los que funcionan perfectos)
+MODELO_PRINCIPAL = "openai/gpt-oss-120b"
+MODELO_FALLBACK = "openai/gpt-oss-20b"
+MODELO_CEREBRAS = "llama-3.3-70b"
 
 SYSTEM_PROMPT = """Eres guionista de un canal de YouTube de documentales de investigación aérea estilo Thriller y True Crime.
 
