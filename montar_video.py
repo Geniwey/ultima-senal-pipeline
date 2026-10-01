@@ -88,7 +88,7 @@ def montar_video_final(carpeta_clips: str, carpeta_audios: str,
     comando = [
         "ffmpeg", "-y", "-i", video_temp, "-i", audio_con_ambiente,
         "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
-        "-c:v", "libx264", "-crf", "18", "-preset", "medium",
+        "-c:v", "libx264", "-crf", "23", "-preset", "medium",
         "-c:a", "aac", "-b:a", "192k",
         "-map", "0:v:0", "-map", "1:a:0",
         "-shortest",
