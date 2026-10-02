@@ -1,9 +1,9 @@
-# Código optimizado forzando fotorrealismo y mitigando clip-arts[span_4](start_span)[span_4](end_span)[span_5](start_span)[span_5](end_span)[span_6](start_span)[span_6](end_span)[span_7](start_span)[span_7](end_span)[span_8](start_span)[span_8](end_span)[span_9](start_span)[span_9](end_span)[span_10](start_span)[span_10](end_span)[span_11](start_span)[span_11](end_span)
 import os
 import sys
 import time
 import base64
 import requests
+import urllib.parse
 
 ESTILO_BASE = (
     "hyper-realistic, cinematic lighting, 8k resolution, documentary photography, "
@@ -46,25 +46,9 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
     if not account_id or not api_token: return False
     
     headers = {"Authorization": f"Bearer {api_token}"}
-    url_klein = f"[https://api.cloudflare.com/client/v4/accounts/](https://api.cloudflare.com/client/v4/accounts/){account_id}/ai/run/@cf/black-forest-labs/flux-2-klein-9b"
+    # El mejor modelo de Cloudflare actualmente (Flux-1-Schnell)
+    url_schnell = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/black-forest-labs/flux-1-schnell"
     
-    try:
-        resp = requests.post(url_klein, headers=headers, json={"prompt": prompt_completo, "width": 1024, "height": 576}, timeout=TIMEOUT)
-        if resp.status_code == 200:
-            if resp.headers.get("content-type", "").startswith("image"):
-                with open(ruta_salida, "wb") as f: f.write(resp.content)
-                if _validar_imagen(ruta_salida): return True
-            else:
-                b64_img = resp.json().get("result", {}).get("image")
-                if b64_img:
-                    with open(ruta_salida, "wb") as f: f.write(base64.b64decode(b64_img))
-                    if _validar_imagen(ruta_salida): return True
-        if resp.status_code == 429 and "daily free allocation" in resp.text:
-            _cloudflare_agotado[0] = True
-            return False
-    except requests.RequestException: pass
-    
-    url_schnell = f"[https://api.cloudflare.com/client/v4/accounts/](https://api.cloudflare.com/client/v4/accounts/){account_id}/ai/run/@cf/black-forest-labs/flux-1-schnell"
     try:
         resp = requests.post(url_schnell, headers=headers, json={"prompt": prompt_completo, "steps": 8}, timeout=TIMEOUT)
         if resp.status_code == 200:
@@ -98,7 +82,7 @@ def _intentar_gemini(prompt_completo: str, ruta_salida: str) -> bool:
     for nombre_clave, api_key in claves:
         headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
         for modelo in modelos:
-            url = f"[https://generativelanguage.googleapis.com/v1beta/models/](https://generativelanguage.googleapis.com/v1beta/models/){modelo}:generateContent"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
             try:
                 resp = requests.post(url, headers=headers, json=payload, timeout=TIMEOUT)
                 if resp.status_code == 200:
@@ -139,7 +123,7 @@ def _intentar_gradio(prompt_completo: str, ruta_salida: str) -> bool:
 def _intentar_huggingface(prompt_completo: str, ruta_salida: str) -> bool:
     api_token = os.environ.get("HF_API_TOKEN")
     if not api_token: return False
-    url = "[https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-3.5-large-turbo](https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-3.5-large-turbo)"
+    url = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-3.5-large-turbo"
     headers = {"Authorization": f"Bearer {api_token}"}
     try:
         resp = requests.post(url, headers=headers, json={"inputs": prompt_completo}, timeout=TIMEOUT)
@@ -147,6 +131,18 @@ def _intentar_huggingface(prompt_completo: str, ruta_salida: str) -> bool:
             with open(ruta_salida, "wb") as f: f.write(resp.content)
             return _validar_imagen(ruta_salida)
     except requests.RequestException: pass
+    return False
+
+def _intentar_pollinations(prompt_completo: str, ruta_salida: str) -> bool:
+    """Fallback final de ultimísima prioridad."""
+    try:
+        prompt_url = urllib.parse.quote(prompt_completo)
+        url = f"https://image.pollinations.ai/prompt/{prompt_url}?width=1024&height=576&nologo=true"
+        resp = requests.get(url, timeout=TIMEOUT)
+        if resp.status_code == 200:
+            with open(ruta_salida, "wb") as f: f.write(resp.content)
+            return _validar_imagen(ruta_salida)
+    except Exception: pass
     return False
 
 def _generar_imagen_emergencia(ruta_salida: str, semilla: int = 0) -> bool:
@@ -166,15 +162,47 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) ->
     prompt_completo = f"{sujeto}, {ESTILO_BASE}"
     _ultima_fue_emergencia[0] = False
     
+    # 1. Cloudflare (Prioridad Máxima)
+    print(" Intentando con Cloudflare (Flux-1-Schnell)...")
     for intento_cf in range(2):
-        if _intentar_cloudflare(prompt_completo, ruta_salida): return True
+        if _intentar_cloudflare(prompt_completo, ruta_salida):
+            print(" ✓ Imagen válida generada con Cloudflare")
+            return True
         if intento_cf == 0: time.sleep(3)
         
-    if _intentar_gemini(prompt_completo, ruta_salida): return True
-    if _intentar_gradio(prompt_completo, ruta_salida): return True
-    if _intentar_huggingface(prompt_completo, ruta_salida): return True
+    # 2. Gemini (Nano Banana)
+    print(" Cloudflare falló, probando Nano Banana (Gemini)...")
+    if _intentar_gemini(prompt_completo, ruta_salida):
+        print(" ✓ Imagen válida generada con Nano Banana")
+        return True
+        
+    # 3. Gradio
+    print(" Nano Banana falló, probando Gradio...")
+    if _intentar_gradio(prompt_completo, ruta_salida):
+        print(" ✓ Imagen válida generada con Gradio")
+        return True
+        
+    # 4. Hugging Face
+    print(" Gradio falló, probando Hugging Face directo...")
+    if _intentar_huggingface(prompt_completo, ruta_salida):
+        print(" ✓ Imagen válida generada con Hugging Face")
+        return True
+        
+    # 5. Pollinations (Última bala real)
+    print(" Proveedores principales fallaron, probando Pollinations como último recurso...")
+    if _intentar_pollinations(prompt_completo, ruta_salida):
+        print(" ✓ Imagen válida generada con Pollinations")
+        return True
     
+    # 6. Emergencia
+    print(" Todos fallaron, usando tarjeta de emergencia...")
     if _generar_imagen_emergencia(ruta_salida, semilla or hash(prompt_escena) % 1000):
         _ultima_fue_emergencia[0] = True
         return True
+        
     return False
+
+if __name__ == "__main__":
+    if len(sys.argv) == 3:
+        exito = generar_imagen(sys.argv[1], sys.argv[2])
+        sys.exit(0 if exito else 1)
