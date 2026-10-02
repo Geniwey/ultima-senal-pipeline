@@ -1,32 +1,17 @@
-"""Última Señal - Voz de Google (gTTS) procesada para Misterio"""
+import asyncio
 import json
 import os
 import sys
 import subprocess
 import time
-from gtts import gTTS
+import edge_tts
 
-def _generar_audio_escena(texto: str, ruta_salida: str):
-    ruta_temp = ruta_salida + ".temp.mp3"
-    
-    # 1. Obtenemos la voz clásica de Google en español
-    tts = gTTS(text=texto, lang='es', tld='com.mx')
-    tts.save(ruta_temp)
-    
-    # 2. PROCESAMIENTO FFmpeg: Bajamos el pitch para hacerla sonar como "narrador de documental / misterio"
-    # asetrate altera el tono (más bajo = más grave), atempo compensa la velocidad.
-    comando = [
-        "ffmpeg", "-y", "-i", ruta_temp,
-        "-af", "asetrate=24000*0.82,aresample=24000,atempo=1.20",
-        ruta_salida
-    ]
-    resultado = subprocess.run(comando, capture_output=True, text=True)
-    
-    if os.path.exists(ruta_temp):
-        os.remove(ruta_temp)
-        
-    if resultado.returncode != 0 or not os.path.exists(ruta_salida):
-        raise RuntimeError(f"Fallo aplicando filtro de voz oscura: {resultado.stderr[-500:]}")
+VOZ = "es-MX-JorgeNeural" # Tono ideal documental
+
+async def _generar_audio_escena(texto: str, ruta_salida: str):
+    # -5Hz lo hace ligeramente más grave sin distorsionar. Las pausas las hace nativas leyendo las comas.
+    comunicador = edge_tts.Communicate(texto, VOZ, rate="+5%", pitch="-5Hz")
+    await comunicador.save(ruta_salida)
 
 def _duracion_audio(ruta: str) -> float:
     resultado = subprocess.run(
@@ -55,13 +40,13 @@ def generar_voces(ruta_guion: str, carpeta_salida: str) -> list:
     
     for i, escena in enumerate(guion["escenas"], start=1):
         ruta_audio = os.path.join(carpeta_salida, f"escena_{i:02d}.mp3")
-        print(f" Generando Voz de Google (Dark Mode) escena {i}/{total_escenas}...")
+        print(f" Generando voz escena {i}/{total_escenas}...")
         
         intentos = 0
         exito = False
         while intentos < 3 and not exito:
             try:
-                _generar_audio_escena(escena["texto_narracion"], ruta_audio)
+                asyncio.run(_generar_audio_escena(escena["texto_narracion"], ruta_audio))
                 if os.path.exists(ruta_audio) and os.path.getsize(ruta_audio) > 1000:
                     exito = True
             except Exception as e:
@@ -70,7 +55,7 @@ def generar_voces(ruta_guion: str, carpeta_salida: str) -> list:
                 intentos += 1
                 
         if not exito:
-            print(f" Falló la voz, usando silencio...")
+            print(f" Falló voz, insertando silencio...")
             _generar_silencio_por_defecto(ruta_audio, escena["texto_narracion"])
             
         duracion = _duracion_audio(ruta_audio)
@@ -88,6 +73,5 @@ def generar_voces(ruta_guion: str, carpeta_salida: str) -> list:
     return info_escenas
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        sys.exit(1)
+    if len(sys.argv) < 3: sys.exit(1)
     generar_voces(sys.argv[1], sys.argv[2])
