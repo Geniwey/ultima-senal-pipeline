@@ -1,22 +1,23 @@
 import os
 import json
 import sys
+import re
 from groq import Groq
 
-MODELO_PRINCIPAL = "llama-3.1-70b-versatile"
-MODELO_FALLBACK = "gemma2-9b-it"
-MODELO_CEREBRAS = "llama3.1-70b"
+# TUS MODELOS ORIGINALES INTACTOS PARA QUE NO DE ERROR 400/404
+MODELO_PRINCIPAL = "openai/gpt-oss-120b"
+MODELO_FALLBACK = "openai/gpt-oss-20b"
+MODELO_CEREBRAS = "llama-3.3-70b"
 
 SYSTEM_PROMPT = """Eres guionista de un canal de YouTube de misterios de aviación. El estilo visual es INFOGRAFÍA DE DATOS.
-
 Reglas estrictas:
 - Nunca describir restos humanos o cuerpos.
-- Español neutro, apto para España y Latinoamérica. Tono grave de investigación.
-- TÍTULO CON BRECHA DE CURIOSIDAD: nunca descriptivo. Usa un título que genere una pregunta.
-- GANCHO INICIAL: Arranca en medio de la alerta, caos o advertencia.
-- PAUSAS: Usa puntos suspensivos (...) y comas estratégicas en "texto_narracion" para la voz TTS.
-- CERO DESPEDIDAS: Termina el guion en seco con la resolución final. NUNCA digas "suscríbete" ni "hasta el próximo vídeo".
-- Devuelve SOLO un JSON válido, sin texto adicional:
+- Español neutro. Tono grave y cinemático de misterio.
+- TÍTULO CON BRECHA DE CURIOSIDAD: nunca descriptivo. Usa un título que genere una pregunta inevitable.
+- GANCHO INICIAL: Arranca in media res en medio del caos o alerta técnica, antes de dar el contexto.
+- PAUSAS: Usa puntos suspensivos (...) y comas estratégicas en "texto_narracion" para obligar al TTS a hacer pausas dramáticas.
+- PROHIBICIÓN ABSOLUTA DE DESPEDIDAS: Termina en seco con la moraleja o lección. Cero menciones a likes, suscripciones o hasta pronto.
+- Devuelve SOLO un JSON válido:
 {
   "titulo_video": "titulo con brecha, máximo 60 caracteres",
   "descripcion_youtube": "descripción para YouTube",
@@ -29,11 +30,10 @@ Reglas estrictas:
       "texto_narracion": "frase corta, 8-15 palabras, con pausas...",
       "texto_pantalla": "2-5 palabras MAYÚSCULAS",
       "duracion_segundos": 4.5,
-      "prompt_imagen": "vector infographic, technical aviation schematic diagram of [sujeto exacto], dark mode, neon accents, flat design, no text"
+      "prompt_imagen": "vector infographic, technical aviation schematic diagram of [sujeto exacto], dark mode, neon accents, clean lines, no text"
     }
   ]
 }
-
 Genera entre 70 y 90 escenas para un ritmo ágil."""
 
 def _llamar_groq(cliente: Groq, tema: str, modelo: str) -> str:
@@ -58,8 +58,11 @@ def _llamar_cerebras(tema: str) -> str:
 
 def _limpiar_y_parsear(texto: str) -> dict:
     if not texto or not texto.strip(): raise ValueError("Respuesta vacía")
-    texto = texto.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    return json.loads(texto)
+    # Buscamos el JSON mediante Regex para evitar fallos si el modelo mete texto explicativo
+    match = re.search(r'\{.*\}', texto, re.DOTALL)
+    if match:
+        return json.loads(match.group(0))
+    return json.loads(texto.strip())
 
 def generar_guion(tema: str) -> dict:
     api_key = os.environ.get("GROQ_API_KEY")
@@ -81,7 +84,7 @@ def generar_guion(tema: str) -> dict:
         if "escenas" in datos and len(datos["escenas"]) >= 40: return datos
     except Exception as e: print(f" Fallo con Cerebras: {e}")
         
-    raise RuntimeError("Fallo total al generar guion")
+    raise RuntimeError("No se pudo generar un guion válido con ningún proveedor")
 
 if __name__ == "__main__":
     if len(sys.argv) < 3: sys.exit(1)
