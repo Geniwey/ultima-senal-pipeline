@@ -1,19 +1,32 @@
-# Código optimizado usando voz grave y puntuación para naturalidad[span_14](start_span)[span_14](end_span)[span_15](start_span)[span_15](end_span)[span_16](start_span)[span_16](end_span)
-import asyncio
+"""Última Señal - Voz de Google (gTTS) procesada para Misterio"""
 import json
 import os
 import sys
 import subprocess
 import time
-import edge_tts
+from gtts import gTTS
 
-VOZ = "es-MX-JorgeNeural" # Voz profunda y sobria, ideal para misterio
-
-async def _generar_audio_escena(texto: str, ruta_salida: str):
-    # Se eliminaron las alteraciones matemáticas de pitch/rate.
-    # El LLM inserta puntuación que Edge-TTS interpreta como pausas dramáticas reales.
-    comunicador = edge_tts.Communicate(texto, VOZ, rate="+0%", pitch="-2Hz")
-    await comunicador.save(ruta_salida)
+def _generar_audio_escena(texto: str, ruta_salida: str):
+    ruta_temp = ruta_salida + ".temp.mp3"
+    
+    # 1. Obtenemos la voz clásica de Google en español
+    tts = gTTS(text=texto, lang='es', tld='com.mx')
+    tts.save(ruta_temp)
+    
+    # 2. PROCESAMIENTO FFmpeg: Bajamos el pitch para hacerla sonar como "narrador de documental / misterio"
+    # asetrate altera el tono (más bajo = más grave), atempo compensa la velocidad.
+    comando = [
+        "ffmpeg", "-y", "-i", ruta_temp,
+        "-af", "asetrate=24000*0.82,aresample=24000,atempo=1.20",
+        ruta_salida
+    ]
+    resultado = subprocess.run(comando, capture_output=True, text=True)
+    
+    if os.path.exists(ruta_temp):
+        os.remove(ruta_temp)
+        
+    if resultado.returncode != 0 or not os.path.exists(ruta_salida):
+        raise RuntimeError(f"Fallo aplicando filtro de voz oscura: {resultado.stderr[-500:]}")
 
 def _duracion_audio(ruta: str) -> float:
     resultado = subprocess.run(
@@ -42,13 +55,13 @@ def generar_voces(ruta_guion: str, carpeta_salida: str) -> list:
     
     for i, escena in enumerate(guion["escenas"], start=1):
         ruta_audio = os.path.join(carpeta_salida, f"escena_{i:02d}.mp3")
-        print(f" Generando voz escena {i}/{total_escenas}...")
+        print(f" Generando Voz de Google (Dark Mode) escena {i}/{total_escenas}...")
         
         intentos = 0
         exito = False
-        while intentos < 4 and not exito:
+        while intentos < 3 and not exito:
             try:
-                asyncio.run(_generar_audio_escena(escena["texto_narracion"], ruta_audio))
+                _generar_audio_escena(escena["texto_narracion"], ruta_audio)
                 if os.path.exists(ruta_audio) and os.path.getsize(ruta_audio) > 1000:
                     exito = True
             except Exception as e:
@@ -57,7 +70,7 @@ def generar_voces(ruta_guion: str, carpeta_salida: str) -> list:
                 intentos += 1
                 
         if not exito:
-            print(f" No se pudo generar voz para la escena {i}, usando silencio...")
+            print(f" Falló la voz, usando silencio...")
             _generar_silencio_por_defecto(ruta_audio, escena["texto_narracion"])
             
         duracion = _duracion_audio(ruta_audio)
