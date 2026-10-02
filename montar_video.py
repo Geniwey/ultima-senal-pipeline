@@ -1,4 +1,3 @@
-# Código estable[span_24](start_span)[span_24](end_span)[span_25](start_span)[span_25](end_span)[span_26](start_span)[span_26](end_span)
 import subprocess
 import os
 import json
@@ -6,30 +5,24 @@ from generar_intro import generar_intro, generar_outro
 from generar_ambiente import generar_ambiente, mezclar_con_narracion, generar_alarma_intro
 
 def _duracion_audio(ruta: str) -> float:
-    resultado = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "default=noprint_wrappers=1:nokey=1", ruta],
-        capture_output=True, text=True
-    )
+    resultado = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", ruta], capture_output=True, text=True)
     return float(resultado.stdout.strip())
 
 def _concatenar_audios(rutas_audio: list, ruta_salida: str):
     lista_txt = ruta_salida + "_lista.txt"
     with open(lista_txt, "w", encoding="utf-8") as f:
-        for ruta in rutas_audio:
-            f.write(f"file '{os.path.abspath(ruta)}'\n")
+        for ruta in rutas_audio: f.write(f"file '{os.path.abspath(ruta)}'\n")
     subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", lista_txt, "-c", "copy", ruta_salida], capture_output=True)
     os.remove(lista_txt)
 
 def _concatenar_video(rutas_clips: list, ruta_salida: str):
     lista_txt = ruta_salida + "_lista.txt"
     with open(lista_txt, "w", encoding="utf-8") as f:
-        for ruta in rutas_clips:
-            f.write(f"file '{os.path.abspath(ruta)}'\n")
+        for ruta in rutas_clips: f.write(f"file '{os.path.abspath(ruta)}'\n")
     subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", lista_txt, "-c", "copy", ruta_salida], capture_output=True)
     os.remove(lista_txt)
 
-def _generar_silencio(ruta_salida: str, duracion: int):
+def _generar_silencio(ruta_salida: str, duracion: float):
     subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", str(duracion), "-q:a", "9", "-acodec", "libmp3lame", ruta_salida], capture_output=True)
 
 def montar_video_final(carpeta_clips: str, carpeta_audios: str, ruta_salida: str, info_escenas_path: str):
@@ -43,10 +36,12 @@ def montar_video_final(carpeta_clips: str, carpeta_audios: str, ruta_salida: str
     generar_intro(ruta_intro)
     ruta_outro = ruta_salida + "_outro_temp.mp4"
     generar_outro(ruta_outro)
+    
     ruta_intro_alarma = ruta_salida + "_intro_alarma_temp.mp3"
-    generar_alarma_intro(ruta_intro_alarma, 3)
+    generar_alarma_intro(ruta_intro_alarma, 2.5) 
+    
     ruta_outro_silencio = ruta_salida + "_outro_silencio_temp.mp3"
-    _generar_silencio(ruta_outro_silencio, 3)
+    _generar_silencio(ruta_outro_silencio, 2.0)
     
     video_temp = ruta_salida + "_video_temp.mp4"
     _concatenar_video([ruta_intro] + rutas_clips + [ruta_outro], video_temp)
