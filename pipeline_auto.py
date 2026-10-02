@@ -1,4 +1,3 @@
-# Código orquestador estable[span_27](start_span)[span_27](end_span)[span_28](start_span)[span_28](end_span)[span_29](start_span)[span_29](end_span)[span_30](start_span)[span_30](end_span)
 import os
 import sys
 import json
@@ -55,7 +54,7 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
 
     fallidas = _generar_todas(info_escenas)
     if fallidas:
-        time.sleep(90)
+        time.sleep(60)
         _generar_todas(fallidas)
         
     print("\n=== 4/6: Animación ===")
@@ -69,7 +68,7 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
     
     ruta_metadata = os.path.join(carpeta_proyecto, "metadata_youtube.txt")
     capitulos = []
-    tiempo_acumulado = 3.0
+    tiempo_acumulado = 2.5
     paso = max(len(info_escenas) // 7, 1)
     
     for i, escena in enumerate(info_escenas):
