@@ -1,29 +1,38 @@
-"""Última Señal - Bumper de alta retención (Radar Alert)"""
+"""Última Señal - Miniatura de CTR Extremo"""
 import subprocess
 import os
 
-ANCHO, ALTO = 1920, 1080
-DURACION = 2.5
-COLOR_FONDO = "0x050505"
-COLOR_ALERTA = "0xFF1111"
-
-def generar_intro(ruta_salida: str):
-    # Efecto de radar, línea de escaneo, y parpadeo rápido tipo "CRITICAL ERROR"
+def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, ruta_salida: str):
+    if not os.path.exists(ruta_imagen_base):
+        raise RuntimeError(f"No existe la imagen base para la miniatura: {ruta_imagen_base}")
+        
+    texto_seguro = titulo_corto[:30].upper().replace("\\", "").replace(":", "").replace("'", "").replace('"', "")
+    ancho_util = 1200
+    fontsize = min(150, max(85, int(ancho_util / (max(len(texto_seguro), 1) * 0.55))))
+    
     filtro = (
-        f"color=c={COLOR_FONDO}:s={ANCHO}x{ALTO}:d={DURACION},"
-        f"drawgrid=w=100:h=100:t=2:c={COLOR_ALERTA}@0.3,"
-        f"drawtext=text='ÚLTIMA SEÑAL':fontcolor={COLOR_ALERTA}:fontsize=180:"
-        f"font='DejaVu Sans Bold':x=(w-text_w)/2:y=(h-text_h)/2:"
-        f"alpha='if(lt(mod(t,0.3),0.15),1,0.2)'," # Parpadeo cardíaco
-        f"noise=alls=20:allf=t+u" # Ruido de cámara/pantalla rota
+        "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,"
+        # Ajustes brutales de color para CTR (Saturación y contraste de neón)
+        "eq=contrast=1.4:saturation=1.5:brightness=-0.05,"
+        # Viñeta oscura muy fuerte para forzar la vista al centro
+        "vignette=angle=PI/2:mode=backward,"
+        # Bandas horizontales para aspecto de documento clasificado / HUD de avión
+        "drawbox=x=0:y=0:w=1280:h=30:color=black@0.9:t=fill,"
+        "drawbox=x=0:y=690:w=1280:h=30:color=black@0.9:t=fill,"
+        # Texto gigante amarillo fosforito, borde súper gordo
+        f"drawtext=text='{texto_seguro}':fontcolor=#FFE800:fontsize={fontsize}:"
+        f"font='DejaVu Sans Bold':borderw=12:bordercolor=black@1.0:"
+        f"shadowcolor=black@0.8:shadowx=15:shadowy=15:"
+        f"x=(w-text_w)/2:y=h-(text_h+50)"
     )
-    comando = ["ffmpeg", "-y", "-f", "lavfi", "-i", filtro, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-t", str(DURACION), ruta_salida]
-    subprocess.run(comando, capture_output=True, text=True)
-    return ruta_salida
-
-def generar_outro(ruta_salida: str):
-    # Outro de 2 segundos. Negro absoluto. Corte dramático.
-    filtro = f"color=c=black:s={ANCHO}x{ALTO}:d=2"
-    comando = ["ffmpeg", "-y", "-f", "lavfi", "-i", filtro, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-t", "2", ruta_salida]
-    subprocess.run(comando, capture_output=True, text=True)
+    
+    comando = [
+        "ffmpeg", "-y", "-i", ruta_imagen_base,
+        "-vf", filtro, "-frames:v", "1",
+        ruta_salida,
+    ]
+    
+    resultado = subprocess.run(comando, capture_output=True, text=True)
+    if resultado.returncode != 0 or not os.path.exists(ruta_salida):
+        raise RuntimeError(f"Fallo generando la miniatura:\n{resultado.stderr[-600:]}")
     return ruta_salida
