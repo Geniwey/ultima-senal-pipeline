@@ -10,7 +10,8 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
     
     filtro = (
         "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,"
-        "eq=contrast=1.4:saturation=1.5:brightness=-0.05,"
+        # Bajas la saturación a niveles normales para no "freír" los colores neón
+        "eq=contrast=1.1:saturation=1.05:brightness=-0.05,"
         "vignette=angle=PI/2:mode=backward,"
         "drawbox=x=0:y=0:w=1280:h=30:color=black@0.9:t=fill,"
         "drawbox=x=0:y=690:w=1280:h=30:color=black@0.9:t=fill,"
