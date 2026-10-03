@@ -8,25 +8,29 @@ import urllib.parse
 ESTILO_BASE = (
     "modern minimalist vector infographic style, technical aviation schematic diagram, "
     "dark mode background with bright neon orange and cyan accents, data visualization, "
-    "highly detailed technical drawing, flat colors, clean lines, no text, no letters"
+    "highly detailed technical drawing, flat colors, clean lines, ABSOLUTELY NO TEXT, "
+    "NO WORDS, NO LETTERS, NO LABELS, empty diagrams"
 )
 
-PALABRAS_A_EVITAR = ["photo", "realistic", "person", "face", "hands"]
+PALABRAS_A_EVITAR = ["photo", "realistic", "person", "face", "hands", "text", "words", "letters"]
 
 def _limpiar_prompt(prompt: str) -> str:
     prompt_limpio = prompt
-    for palabra in PALABRAS_A_EVITAR: prompt_limpio = prompt_limpio.replace(palabra, "")
+    for palabra in PALABRAS_A_EVITAR:
+        prompt_limpio = prompt_limpio.replace(palabra, "")
     return prompt_limpio.strip()
 
 TIMEOUT = 30
 TAMANO_MINIMO_BYTES = 10_000
+
 _cloudflare_agotado = [False]
 _ultima_fue_emergencia = [False]
 
 def _validar_imagen(ruta: str) -> bool:
     if not os.path.exists(ruta): return False
     if os.path.getsize(ruta) < TAMANO_MINIMO_BYTES: return False
-    with open(ruta, "rb") as f: cabecera = f.read(8)
+    with open(ruta, "rb") as f:
+        cabecera = f.read(8)
     return cabecera.startswith(b"\x89PNG") or cabecera.startswith(b"\xff\xd8\xff")
 
 def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
@@ -34,8 +38,10 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
     account_id = os.environ.get("CF_ACCOUNT_ID")
     api_token = os.environ.get("CF_API_TOKEN")
     if not account_id or not api_token: return False
+    
     headers = {"Authorization": f"Bearer {api_token}"}
     url_schnell = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/black-forest-labs/flux-1-schnell"
+    
     try:
         resp = requests.post(url_schnell, headers=headers, json={"prompt": prompt_completo, "steps": 8}, timeout=TIMEOUT)
         if resp.status_code == 200:
@@ -43,7 +49,8 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
             if b64_img:
                 with open(ruta_salida, "wb") as f: f.write(base64.b64decode(b64_img))
                 return _validar_imagen(ruta_salida)
-        if resp.status_code == 429: _cloudflare_agotado[0] = True
+        if resp.status_code == 429: 
+            _cloudflare_agotado[0] = True
     except requests.RequestException: pass
     return False
 
@@ -86,6 +93,7 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) ->
     if _generar_imagen_emergencia(ruta_salida, semilla or hash(prompt_escena) % 1000):
         _ultima_fue_emergencia[0] = True
         return True
+        
     return False
 
 if __name__ == "__main__":
