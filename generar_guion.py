@@ -4,12 +4,12 @@ import sys
 import re
 from groq import Groq
 
-# TUS MODELOS ORIGINALES INTACTOS PARA QUE NO DE ERROR 400/404
 MODELO_PRINCIPAL = "openai/gpt-oss-120b"
 MODELO_FALLBACK = "openai/gpt-oss-20b"
 MODELO_CEREBRAS = "llama-3.3-70b"
 
 SYSTEM_PROMPT = """Eres guionista de un canal de YouTube de misterios de aviación. El estilo visual es INFOGRAFÍA DE DATOS.
+
 Reglas estrictas:
 - Nunca describir restos humanos o cuerpos.
 - Español neutro. Tono grave y cinemático de misterio.
@@ -23,7 +23,7 @@ Reglas estrictas:
   "descripcion_youtube": "descripción para YouTube",
   "tags_youtube": ["tags", "cortos"],
   "comentario_fijado": "pregunta polarizante para comentarios",
-  "prompt_miniatura": "infographic vector style diagram of [un solo objeto clave], radar background",
+  "prompt_miniatura": "Hyper-realistic cinematic photography, dramatic lighting, extreme close-up of [un solo objeto clave/alarma en cabina], dark and moody atmosphere, 8k resolution, no text",
   "titulo_miniatura": "2-4 palabras MAYÚSCULAS",
   "escenas": [
     {
@@ -34,6 +34,7 @@ Reglas estrictas:
     }
   ]
 }
+
 Genera entre 70 y 90 escenas para un ritmo ágil."""
 
 def _llamar_groq(cliente: Groq, tema: str, modelo: str) -> str:
@@ -58,7 +59,6 @@ def _llamar_cerebras(tema: str) -> str:
 
 def _limpiar_y_parsear(texto: str) -> dict:
     if not texto or not texto.strip(): raise ValueError("Respuesta vacía")
-    # Buscamos el JSON mediante Regex para evitar fallos si el modelo mete texto explicativo
     match = re.search(r'\{.*\}', texto, re.DOTALL)
     if match:
         return json.loads(match.group(0))
