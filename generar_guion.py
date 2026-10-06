@@ -4,11 +4,12 @@ import sys
 import re
 from groq import Groq
 
-MODELO_PRINCIPAL = "llama-3.1-70b-versatile"
-MODELO_FALLBACK = "gemma2-9b-it"
-MODELO_CEREBRAS = "llama3.1-70b"
+# Modelos originales intocables
+MODELO_PRINCIPAL = "openai/gpt-oss-120b"
+MODELO_FALLBACK = "openai/gpt-oss-20b"
+MODELO_CEREBRAS = "llama-3.3-70b"
 
-SYSTEM_PROMPT = """Eres guionista de un canal de YouTube de misterios de aviación. El estilo visual es RENDER 3D ABSTRACTO Y LIMPIO.
+SYSTEM_PROMPT = """Eres guionista de un canal de YouTube de misterios de aviación. El estilo visual es RENDER 3D ABSTRACTO Y MACRO FOTOGRAFÍA SIN TEXTO.
 
 Reglas estrictas:
 - Nunca describir restos humanos o cuerpos.
@@ -17,21 +18,21 @@ Reglas estrictas:
 - GANCHO INICIAL: Arranca in media res en medio del caos o alerta técnica, antes de dar el contexto.
 - PAUSAS: Usa puntos suspensivos (...) y comas estratégicas en "texto_narracion" para obligar al TTS a hacer pausas dramáticas.
 - PROHIBICIÓN ABSOLUTA DE DESPEDIDAS: Termina en seco con la moraleja o lección. Cero menciones a likes o suscripciones.
-- PROHIBICIÓN VISUAL: En "prompt_imagen", NUNCA pidas pantallas, monitores, HUDs, paneles de control, relojes o instrumentos. Pide siempre partes externas del avión (turbinas, alas, fuselaje) o geometría abstracta (ondas de radar, flujo de aire).
+- PROHIBICIÓN VISUAL (ANTI-TEXTO ALIENÍGENA): Los modelos de IA inventan texto falso si les pides pantallas. En "prompt_imagen", NUNCA pidas pantallas, monitores, HUDs, paneles de control, relojes, radares, diagramas, mapas, documentos o instrumentos. Pide SIEMPRE partes externas del avión (turbinas, alas, fuselaje, remaches), luces de emergencia, nubes de tormenta, o geometría abstracta sin etiquetas.
 - Devuelve SOLO un JSON válido:
 {
   "titulo_video": "titulo con brecha, máximo 60 caracteres",
   "descripcion_youtube": "descripción para YouTube",
   "tags_youtube": ["tags", "cortos"],
   "comentario_fijado": "pregunta polarizante para comentarios",
-  "prompt_miniatura": "Hyper-realistic cinematic photography, dramatic lighting, extreme close-up of a damaged airplane turbine, dark and moody atmosphere, 8k resolution, no text",
+  "prompt_miniatura": "Hyper-realistic cinematic photography, extreme close-up of a glowing red emergency light in the dark, moody atmosphere, 8k resolution, NO TEXT",
   "titulo_miniatura": "2-4 palabras MAYÚSCULAS",
   "escenas": [
     {
       "texto_narracion": "frase corta, 8-15 palabras, con pausas...",
       "texto_pantalla": "2-5 palabras MAYÚSCULAS",
       "duracion_segundos": 4.5,
-      "prompt_imagen": "abstract 3D wireframe of an airplane fuselage, neon orange glowing lines, dark mode background, no text, no dials"
+      "prompt_imagen": "macro photography of a metallic airplane wing piercing through dark storm clouds, dramatic lighting, NO TEXT"
     }
   ]
 }
