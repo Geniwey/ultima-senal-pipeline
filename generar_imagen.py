@@ -6,15 +6,15 @@ import requests
 import urllib.parse
 
 ESTILO_BASE = (
-    "pure abstract geometric shapes, glowing neon lines, clean dark background, "
-    "minimalistic data visualization art, macro photography of airplane parts, "
-    "NO NUMBERS, NO DIALS, NO GAUGES, NO TEXT, NO DASHBOARD, empty space"
+    "pure abstract cinematic composition, highly detailed, dramatic studio lighting, "
+    "dark background with glowing accents, macro photography, depth of field, "
+    "ABSOLUTELY NO TEXT, NO NUMBERS, NO DIALS, NO GAUGES, NO DASHBOARD, NO WORDS, NO LETTERS, empty space"
 )
 
 PALABRAS_A_EVITAR = [
     "dashboard", "hud", "interface", "display", "screen", "text", "numbers", 
-    "data", "panel", "dial", "gauge", "cockpit", "monitor", "photo", "realistic", 
-    "person", "face", "hands", "words", "letters", "labels"
+    "data", "panel", "dial", "gauge", "cockpit", "monitor", "radar", "map", 
+    "document", "checklist", "words", "letters", "labels", "diagram", "infographic"
 ]
 
 def _limpiar_prompt(prompt: str) -> str:
