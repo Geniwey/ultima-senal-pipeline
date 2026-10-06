@@ -8,7 +8,7 @@ MODELO_PRINCIPAL = "openai/gpt-oss-120b"
 MODELO_FALLBACK = "openai/gpt-oss-20b"
 MODELO_CEREBRAS = "llama-3.3-70b"
 
-SYSTEM_PROMPT = """Eres guionista de un canal de YouTube de misterios de aviación. El estilo visual es INFOGRAFÍA DE DATOS.
+SYSTEM_PROMPT = """Eres guionista de un canal de YouTube de misterios de aviación. El estilo visual es RENDER 3D HIPERREALISTA.
 
 Reglas estrictas:
 - Nunca describir restos humanos o cuerpos.
@@ -23,14 +23,14 @@ Reglas estrictas:
   "descripcion_youtube": "descripción para YouTube",
   "tags_youtube": ["tags", "cortos"],
   "comentario_fijado": "pregunta polarizante para comentarios",
-  "prompt_miniatura": "Hyper-realistic cinematic photography, dramatic lighting, extreme close-up of [un solo objeto clave/alarma en cabina], dark and moody atmosphere, 8k resolution, no text",
+  "prompt_miniatura": "Cinematic photography, extreme close up of an airplane black box glowing in the dark, red and blue moody lighting, 8k resolution, no text",
   "titulo_miniatura": "2-4 palabras MAYÚSCULAS",
   "escenas": [
     {
       "texto_narracion": "frase corta, 8-15 palabras, con pausas...",
       "texto_pantalla": "2-5 palabras MAYÚSCULAS",
       "duracion_segundos": 4.5,
-      "prompt_imagen": "vector infographic, technical aviation schematic diagram of [sujeto exacto], dark mode, neon accents, clean lines, no text"
+      "prompt_imagen": "Cinematic 3D render of [sujeto exacto], dark studio background, glowing neon blue and orange edge lights, extreme close-up, dramatic shadows, NO TEXT"
     }
   ]
 }
