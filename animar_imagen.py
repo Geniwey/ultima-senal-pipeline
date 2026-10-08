@@ -25,9 +25,11 @@ def animar_imagen(ruta_imagen: str, duracion_segundos: float, ruta_salida: str, 
     
     if texto_pantalla:
         texto_seguro = texto_pantalla.upper().replace("\\", "").replace(":", "").replace("'", "").replace('"', "")
+        # AÑADIDO: box=1 y boxcolor=black@0.6 para que siempre tengan fondo oscuro y resalten.
         filtros.append(
             f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize=80:"
-            f"font='DejaVu Sans Bold':borderw=4:bordercolor=black@0.9:"
+            f"font='DejaVu Sans Bold':box=1:boxcolor=black@0.6:boxborderw=15:"
+            f"borderw=2:bordercolor=black@0.9:"
             f"shadowcolor=black@0.8:shadowx=5:shadowy=5:"
             f"x=(w-text_w)/2:y=h-text_h-120:"
             f"alpha='if(lt(t,0.3),t/0.3,1)'"
