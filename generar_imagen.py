@@ -6,16 +6,11 @@ import requests
 import urllib.parse
 
 ESTILO_BASE = (
-    "pure abstract cinematic composition, highly detailed, dramatic studio lighting, "
-    "dark background with glowing accents, macro photography, depth of field, "
-    "ABSOLUTELY NO TEXT, NO NUMBERS, NO DIALS, NO GAUGES, NO DASHBOARD, NO WORDS, NO LETTERS, empty space"
+    "cinematic lighting, highly detailed 3D render, dark background, "
+    "Unreal Engine 5 style, unmarked clean surfaces, pure visual art, empty scene without labels"
 )
 
-PALABRAS_A_EVITAR = [
-    "dashboard", "hud", "interface", "display", "screen", "text", "numbers", 
-    "data", "panel", "dial", "gauge", "cockpit", "monitor", "radar", "map", 
-    "document", "checklist", "words", "letters", "labels", "diagram", "infographic"
-]
+PALABRAS_A_EVITAR = ["text", "words", "letters", "labels", "numbers", "diagram", "infographic", "person", "face"]
 
 def _limpiar_prompt(prompt: str) -> str:
     prompt_limpio = prompt
@@ -64,8 +59,8 @@ def _intentar_pollinations(prompt_completo: str, ruta_salida: str) -> bool:
 
 def _generar_imagen_emergencia(ruta_salida: str, semilla: int = 0) -> bool:
     import subprocess
-    color_fondo = "0x0A0F1A"
-    filtro = f"color=c={color_fondo}:s=1024x576:d=1,drawgrid=w=50:h=50:t=1:c=0x1B2A4A,noise=alls=10:allf=t+u"
+    color_fondo = "0x050505"
+    filtro = f"color=c={color_fondo}:s=1024x576:d=1,drawgrid=w=50:h=50:t=1:c=0x1B2A4A,noise=alls=15:allf=t+u"
     comando = ["ffmpeg", "-y", "-f", "lavfi", "-i", filtro, "-frames:v", "1", ruta_salida]
     resultado = subprocess.run(comando, capture_output=True, text=True)
     return resultado.returncode == 0 and os.path.exists(ruta_salida)
@@ -78,15 +73,12 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) ->
     prompt_completo = f"{sujeto}, {ESTILO_BASE}"
     _ultima_fue_emergencia[0] = False
     
-    print(" Intentando con Cloudflare...")
     for intento_cf in range(2):
         if _intentar_cloudflare(prompt_completo, ruta_salida): return True
         if intento_cf == 0: time.sleep(3)
         
-    print(" Probando Pollinations como respaldo...")
     if _intentar_pollinations(prompt_completo, ruta_salida): return True
     
-    print(" Generando radar de emergencia...")
     if _generar_imagen_emergencia(ruta_salida, semilla or hash(prompt_escena) % 1000):
         _ultima_fue_emergencia[0] = True
         return True
