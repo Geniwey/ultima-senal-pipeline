@@ -3,7 +3,6 @@ import sys
 import time
 import base64
 import requests
-import urllib.parse
 
 ESTILO_BASE = (
     "cinematic lighting, highly detailed 3D render, dark background, "
@@ -19,7 +18,6 @@ def _limpiar_prompt(prompt: str) -> str:
 
 TIMEOUT = 30
 TAMANO_MINIMO_BYTES = 10_000
-_cloudflare_agotado = [False]
 _ultima_fue_emergencia = [False]
 
 def _validar_imagen(ruta: str) -> bool:
@@ -29,32 +27,31 @@ def _validar_imagen(ruta: str) -> bool:
     return cabecera.startswith(b"\x89PNG") or cabecera.startswith(b"\xff\xd8\xff")
 
 def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
-    if _cloudflare_agotado[0]: return False
     account_id = os.environ.get("CF_ACCOUNT_ID")
     api_token = os.environ.get("CF_API_TOKEN")
     if not account_id or not api_token: return False
+    
     headers = {"Authorization": f"Bearer {api_token}"}
-    url_schnell = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/black-forest-labs/flux-1-schnell"
-    try:
-        resp = requests.post(url_schnell, headers=headers, json={"prompt": prompt_completo, "steps": 8}, timeout=TIMEOUT)
-        if resp.status_code == 200:
-            b64_img = resp.json().get("result", {}).get("image")
-            if b64_img:
-                with open(ruta_salida, "wb") as f: f.write(base64.b64decode(b64_img))
-                return _validar_imagen(ruta_salida)
-        if resp.status_code == 429: _cloudflare_agotado[0] = True
-    except requests.RequestException: pass
-    return False
-
-def _intentar_pollinations(prompt_completo: str, ruta_salida: str) -> bool:
-    try:
-        prompt_url = urllib.parse.quote(prompt_completo)
-        url = f"https://image.pollinations.ai/prompt/{prompt_url}?width=1024&height=576&nologo=true"
-        resp = requests.get(url, timeout=TIMEOUT)
-        if resp.status_code == 200:
-            with open(ruta_salida, "wb") as f: f.write(resp.content)
-            return _validar_imagen(ruta_salida)
-    except Exception: pass
+    
+    # ROTACIÓN DE MODELOS: Si falla uno por cuota, usa el siguiente. NUNCA usamos Pollinations.
+    modelos_cf = [
+        "@cf/black-forest-labs/flux-1-schnell",
+        "@cf/stabilityai/stable-diffusion-xl-base-1.0",
+        "@cf/bytedance/sdxl-lightning"
+    ]
+    
+    for modelo in modelos_cf:
+        url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{modelo}"
+        try:
+            resp = requests.post(url, headers=headers, json={"prompt": prompt_completo, "steps": 8}, timeout=TIMEOUT)
+            if resp.status_code == 200:
+                b64_img = resp.json().get("result", {}).get("image")
+                if b64_img:
+                    with open(ruta_salida, "wb") as f: f.write(base64.b64decode(b64_img))
+                    if _validar_imagen(ruta_salida):
+                        return True
+        except requests.RequestException:
+            continue
     return False
 
 def _generar_imagen_emergencia(ruta_salida: str, semilla: int = 0) -> bool:
@@ -73,12 +70,12 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) ->
     prompt_completo = f"{sujeto}, {ESTILO_BASE}"
     _ultima_fue_emergencia[0] = False
     
-    for intento_cf in range(2):
+    print(" Intentando generar imagen de alta calidad con Cloudflare...")
+    for intento in range(2):
         if _intentar_cloudflare(prompt_completo, ruta_salida): return True
-        if intento_cf == 0: time.sleep(3)
-        
-    if _intentar_pollinations(prompt_completo, ruta_salida): return True
+        time.sleep(3)
     
+    print(" Todos los modelos visuales fallaron. Generando radar de emergencia...")
     if _generar_imagen_emergencia(ruta_salida, semilla or hash(prompt_escena) % 1000):
         _ultima_fue_emergencia[0] = True
         return True
