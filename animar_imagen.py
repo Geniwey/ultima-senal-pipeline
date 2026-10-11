@@ -6,7 +6,7 @@ ANCHO, ALTO = 1920, 1080
 VARIANTES = [
     {"zoom_inicial": 1.0, "zoom_final": 1.15, "pan_x": "iw/2-(iw/zoom/2)+10*sin(on/20)", "pan_y": "ih/2-(ih/zoom/2)"},
     {"zoom_inicial": 1.15, "zoom_final": 1.0, "pan_x": "iw/2-(iw/zoom/2)+10*sin(on/25)", "pan_y": "ih/2-(ih/zoom/2)"},
-    {"zoom_inicial": 1.05, "zoom_final": 1.2, "pan_x": "0", "pan_y": "ih/2-(ih/zoom/2)"},
+    {"zoom_inicial": 1.05, "zoom_final": 1.2, "pan_x": "0", "pan_y": "ih/2-(ih/zoom/2)+5*sin(on/15)"},
     {"zoom_inicial": 1.2, "zoom_final": 1.05, "pan_x": "iw-iw/zoom", "pan_y": "ih-ih/zoom"},
 ]
 
@@ -25,13 +25,13 @@ def animar_imagen(ruta_imagen: str, duracion_segundos: float, ruta_salida: str, 
     
     if texto_pantalla:
         texto_seguro = texto_pantalla.upper().replace("\\", "").replace(":", "").replace("'", "").replace('"', "")
-        # AÑADIDO: box=1 y boxcolor=black@0.6 para que siempre tengan fondo oscuro y resalten.
+        # Caja negra translúcida más sutil y letra más clara
         filtros.append(
-            f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize=80:"
-            f"font='DejaVu Sans Bold':box=1:boxcolor=black@0.6:boxborderw=15:"
-            f"borderw=2:bordercolor=black@0.9:"
+            f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize=75:"
+            f"font='DejaVu Sans Bold':box=1:boxcolor=black@0.5:boxborderw=20:"
+            f"borderw=2:bordercolor=black@1.0:"
             f"shadowcolor=black@0.8:shadowx=5:shadowy=5:"
-            f"x=(w-text_w)/2:y=h-text_h-120:"
+            f"x=(w-text_w)/2:y=h-text_h-100:"
             f"alpha='if(lt(t,0.3),t/0.3,1)'"
         )
         
