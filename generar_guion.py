@@ -4,50 +4,36 @@ import sys
 import re
 from groq import Groq
 
-MODELO_PRINCIPAL = "openai/gpt-oss-120b"
-MODELO_FALLBACK = "openai/gpt-oss-20b"
-MODELO_CEREBRAS = "llama-3.3-70b"
+MODELO_PRINCIPAL = "llama-3.1-70b-versatile"
+MODELO_FALLBACK = "gemma2-9b-it"
+MODELO_CEREBRAS = "llama3.1-70b"
 
-SYSTEM_PROMPT = """Eres el mejor guionista de YouTube de misterios de aviación. 
+SYSTEM_PROMPT = """Eres el mejor guionista de YouTube de misterios de aviación. El estilo visual es RENDER 3D CINEMÁTICO.
 
-Regla de ORO: Tu narrativa no puede ser un bucle de alarmas. DEBES contar una historia real con contexto.
+Reglas estrictas para evitar vídeos aburridos (EFECTO POWERPOINT):
+1. RITMO FRENÉTICO: Crea un mínimo de 45 escenas. Cada escena debe durar máximo 4.5 segundos.
+2. TEXTO DE PANTALLA DINÁMICO: El campo "texto_pantalla" (2-4 palabras MAYÚSCULAS) DEBE CAMBIAR en cada maldita escena. NUNCA dejes el mismo texto en escenas consecutivas.
+3. CERO TEXTO EN IMÁGENES: En "prompt_imagen", NUNCA pidas carteles, documentos, pantallas con letras, ni palabras en inglés. Pide: "cinematic macro photography of airplane parts, dark clouds, glowing lights, NO TEXT".
+4. ESTRUCTURA: Arranca con 5 segundos de tensión máxima en la escena 1. Luego da contexto, investiga y resuelve.
+5. NO DESPEDIDAS.
 
-Devuelve SOLO un JSON válido con esta estructura estricta, separando la historia en 3 actos:
+Devuelve SOLO un JSON válido con esta estructura:
 {
-  "titulo_video": "titulo con brecha de curiosidad, máximo 60 caracteres",
+  "titulo_video": "titulo con brecha, máximo 60 caracteres",
   "descripcion_youtube": "descripción para YouTube",
   "tags_youtube": ["tags", "cortos"],
   "comentario_fijado": "pregunta polarizante para comentarios",
-  "prompt_miniatura": "Hyper-realistic cinematic photography, an airplane cockpit window looking out at a dark storm, a glowing red emergency light reflecting on the glass, 8k resolution, unmarked clean surfaces",
+  "prompt_miniatura": "Hyper-realistic photography, terrifying view of a massive dark storm from an airplane window, red emergency light reflection, NO TEXT",
   "titulo_miniatura": "¿QUÉ VIERON LOS PILOTOS?",
-  
-  "acto_1_caos": [
+  "escenas": [
     {
       "texto_narracion": "frase corta, 8-15 palabras, con pausas...",
-      "texto_pantalla": "EL DESASTRE COMIENZA",
+      "texto_pantalla": "FALLO INICIAL",
       "duracion_segundos": 4.5,
-      "prompt_imagen": "cinematic 3D render of a commercial airplane flying through dark storm clouds"
-    }
-  ],
-  "acto_2_investigacion": [
-    {
-      "texto_narracion": "Explica el contexto, qué falló, la caja negra...",
-      "texto_pantalla": "LA VERDAD OCULTA",
-      "duracion_segundos": 4.5,
-      "prompt_imagen": "cinematic macro photography of broken airplane metal parts"
-    }
-  ],
-  "acto_3_resolucion": [
-    {
-      "texto_narracion": "El impacto final y cómo cambió la aviación...",
-      "texto_pantalla": "EL LEGADO",
-      "duracion_segundos": 4.5,
-      "prompt_imagen": "cinematic view of a dark empty runway at night"
+      "prompt_imagen": "cinematic 3D render of an airplane flying into a massive dark storm cloud, dramatic lighting, NO TEXT"
     }
   ]
-}
-
-Genera exactamente 15 escenas en el acto 1, 20 escenas en el acto 2, y 15 escenas en el acto 3."""
+}"""
 
 def _llamar_groq(cliente: Groq, tema: str, modelo: str) -> str:
     respuesta = cliente.chat.completions.create(
@@ -72,20 +58,8 @@ def _llamar_cerebras(tema: str) -> str:
 def _limpiar_y_parsear(texto: str) -> dict:
     if not texto or not texto.strip(): raise ValueError("Respuesta vacía")
     match = re.search(r'\{.*\}', texto, re.DOTALL)
-    if match:
-        datos_brutos = json.loads(match.group(0))
-    else:
-        datos_brutos = json.loads(texto.strip())
-        
-    # Unificar los 3 actos en una sola lista de "escenas" para que el pipeline no se rompa
-    escenas_completas = []
-    if "acto_1_caos" in datos_brutos: escenas_completas.extend(datos_brutos["acto_1_caos"])
-    if "acto_2_investigacion" in datos_brutos: escenas_completas.extend(datos_brutos["acto_2_investigacion"])
-    if "acto_3_resolucion" in datos_brutos: escenas_completas.extend(datos_brutos["acto_3_resolucion"])
-    if "escenas" in datos_brutos: escenas_completas.extend(datos_brutos["escenas"]) # Por si acaso el modelo desobedece
-    
-    datos_brutos["escenas"] = escenas_completas
-    return datos_brutos
+    if match: return json.loads(match.group(0))
+    return json.loads(texto.strip())
 
 def generar_guion(tema: str) -> dict:
     api_key = os.environ.get("GROQ_API_KEY")
@@ -96,14 +70,14 @@ def generar_guion(tema: str) -> dict:
         try:
             texto = _llamar_groq(cliente, tema, modelo)
             datos = _limpiar_y_parsear(texto)
-            if "escenas" in datos and len(datos["escenas"]) >= 30: return datos
-        except Exception as e: print(f" Fallo con {modelo}: {e}")
+            if "escenas" in datos and len(datos["escenas"]) >= 20: return datos
+        except Exception: pass
             
     try:
         texto = _llamar_cerebras(tema)
         datos = _limpiar_y_parsear(texto)
-        if "escenas" in datos and len(datos["escenas"]) >= 30: return datos
-    except Exception as e: print(f" Fallo con Cerebras: {e}")
+        if "escenas" in datos and len(datos["escenas"]) >= 20: return datos
+    except Exception: pass
         
     raise RuntimeError("No se pudo generar un guion válido")
 
