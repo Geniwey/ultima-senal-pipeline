@@ -1,8 +1,8 @@
 import os
 import sys
 import json
-import time
 import shutil
+from PIL import Image
 
 from generar_guion import generar_guion
 from generar_imagen import generar_imagen
@@ -12,7 +12,6 @@ from montar_video import montar_video_final
 from generar_miniatura import generar_miniatura_desde_imagen
 
 def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
-    # LIMPIEZA ABSOLUTA: Destruir caché anterior
     if os.path.exists(carpeta_proyecto):
         shutil.rmtree(carpeta_proyecto)
     os.makedirs(carpeta_proyecto, exist_ok=True)
@@ -24,11 +23,10 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
         json.dump(guion, f, ensure_ascii=False, indent=2)
         
     print("\n=== 2/6: Voz ===")
-    # generar_voces YA EXTRAE LA DURACIÓN REAL DEL AUDIO y la mete en info_escenas
     carpeta_audio = os.path.join(carpeta_proyecto, "audio")
     info_escenas = generar_voces(ruta_guion, carpeta_audio)
     
-    print("\n=== 3/6: Imágenes (Con visión artificial OCR) ===")
+    print("\n=== 3/6: Imágenes (Con Visión Artificial y Blindaje) ===")
     carpeta_imagenes = os.path.join(carpeta_proyecto, "imagenes")
     os.makedirs(carpeta_imagenes, exist_ok=True)
     
@@ -36,30 +34,25 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
     if guion.get("prompt_miniatura"):
         generar_imagen(guion["prompt_miniatura"], ruta_base_miniatura)
 
-    fallos_consecutivos = 0
-    limite_fallos = len(info_escenas) * 0.25 # Tolerancia del 25% de fallos
-    
     for i, escena in enumerate(info_escenas):
         ruta_img = os.path.join(carpeta_imagenes, f"escena_{escena['indice']:02d}.png")
         print(f" Generando imagen {i+1}/{len(info_escenas)}...")
         
         exito = generar_imagen(escena["prompt_imagen"], ruta_img)
         
-        # SISTEMA DE CONTINGENCIA: Si falla, clona la imagen anterior (o la siguiente disponible) 
-        # CERO pantallas rojas/negras.
-        if not exito:
-            fallos_consecutivos += 1
-            if fallos_consecutivos > limite_fallos:
-                raise RuntimeError("Límite de fallos de API visual superado. Abortando pipeline.")
-                
-            print("  [CLONANDO] Usando imagen vecina para tapar el fallo...")
+        # SISTEMA INDESTRUCTIBLE: Si la API o el OCR fallan, GARANTIZAMOS que haya un archivo.
+        if not exito or not os.path.exists(ruta_img) or os.path.getsize(ruta_img) < 1000:
+            print("  [CLONANDO/RESCATE] Usando imagen vecina o de emergencia...")
             img_anterior = os.path.join(carpeta_imagenes, f"escena_{escena['indice']-1:02d}.png")
-            if os.path.exists(img_anterior):
+            
+            if os.path.exists(img_anterior) and os.path.getsize(img_anterior) > 1000:
                 shutil.copy(img_anterior, ruta_img)
-            else:
+            elif os.path.exists(ruta_base_miniatura) and os.path.getsize(ruta_base_miniatura) > 1000:
                 shutil.copy(ruta_base_miniatura, ruta_img)
-        else:
-            fallos_consecutivos = max(0, fallos_consecutivos - 1)
+            else:
+                # EL SALVAVIDAS FINAL: Si no hay NADA de donde copiar, Python dibuja un fondo oscuro.
+                # Así el vídeo NUNCA se quedará en negro ni se estrellará.
+                Image.new('RGB', (1024, 576), color=(8, 12, 18)).save(ruta_img)
             
     print("\n=== 4/6: Animación ===")
     carpeta_clips = os.path.join(carpeta_proyecto, "clips")
@@ -72,7 +65,7 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
     
     print("\n=== 6/6: Miniatura ===")
     ruta_miniatura = os.path.join(carpeta_proyecto, "miniatura.png")
-    texto_miniatura = guion.get("titulo_miniatura") or guion.get("titulo_video", "")
+    texto_miniatura = guion.get("titulo_miniatura") or guion.get("titulo_video", "¿QUÉ PASÓ?")
     if os.path.exists(ruta_base_miniatura):
         generar_miniatura_desde_imagen(ruta_base_miniatura, texto_miniatura, ruta_miniatura)
         
