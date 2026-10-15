@@ -5,27 +5,55 @@ from generar_intro import generar_intro, generar_outro
 from generar_ambiente import generar_ambiente, mezclar_con_narracion, generar_alarma_intro
 
 def _duracion_audio(ruta: str) -> float:
-    resultado = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", ruta], capture_output=True, text=True)
+    resultado = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", ruta],
+        capture_output=True, text=True
+    )
     return float(resultado.stdout.strip())
 
 def _concatenar_audios(rutas_audio: list, ruta_salida: str):
+    rutas_validas = [r for r in rutas_audio if os.path.exists(r) and os.path.getsize(r) > 100]
+    if not rutas_validas:
+        raise RuntimeError("No hay archivos de audio válidos para concatenar.")
     lista_txt = ruta_salida + "_lista.txt"
     with open(lista_txt, "w", encoding="utf-8") as f:
-        for ruta in rutas_audio: f.write(f"file '{os.path.abspath(ruta)}'\n")
-    subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", lista_txt, "-c", "copy", ruta_salida], capture_output=True)
-    os.remove(lista_txt)
+        for ruta in rutas_validas:
+            f.write(f"file '{os.path.abspath(ruta)}'\n")
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", lista_txt, "-c:a", "libmp3lame", "-q:a", "2", ruta_salida],
+        capture_output=True
+    )
+    if os.path.exists(lista_txt):
+        os.remove(lista_txt)
 
 def _concatenar_video(rutas_clips: list, ruta_salida: str):
+    rutas_validas = [r for r in rutas_clips if os.path.exists(r) and os.path.getsize(r) > 1000]
+    if len(rutas_validas) <= 2:
+        raise RuntimeError(f"Error crítico: Solo existen {len(rutas_validas)} clips válidos. Falló la generación de clips.")
     lista_txt = ruta_salida + "_lista.txt"
     with open(lista_txt, "w", encoding="utf-8") as f:
-        for ruta in rutas_clips: f.write(f"file '{os.path.abspath(ruta)}'\n")
-    subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", lista_txt, "-c", "copy", ruta_salida], capture_output=True)
-    os.remove(lista_txt)
+        for ruta in rutas_validas:
+            f.write(f"file '{os.path.abspath(ruta)}'\n")
+    # Recodificación rápida al concatenar para garantizar que no haya saltos de timestamp entre intro y escenas
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", lista_txt,
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", "-r", "30",
+            ruta_salida
+        ],
+        capture_output=True
+    )
+    if os.path.exists(lista_txt):
+        os.remove(lista_txt)
 
 def _generar_silencio(ruta_salida: str, duracion: float):
-    subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", str(duracion), "-q:a", "9", "-acodec", "libmp3lame", ruta_salida], capture_output=True)
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", str(duracion), "-q:a", "9", "-acodec", "libmp3lame", ruta_salida],
+        capture_output=True
+    )
 
 def montar_video_final(carpeta_clips: str, carpeta_audios: str, ruta_salida: str, info_escenas_path: str):
+    os.makedirs(os.path.dirname(os.path.abspath(ruta_salida)), exist_ok=True)
     with open(info_escenas_path, "r", encoding="utf-8") as f:
         info_escenas = json.load(f)
         
@@ -59,12 +87,13 @@ def montar_video_final(carpeta_clips: str, carpeta_audios: str, ruta_salida: str
     comando = [
         "ffmpeg", "-y", "-i", video_temp, "-i", audio_con_ambiente,
         "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
-        "-c:v", "libx264", "-crf", "23", "-preset", "medium",
+        "-c:v", "copy",
         "-c:a", "aac", "-b:a", "192k",
         "-map", "0:v:0", "-map", "1:a:0", "-shortest", ruta_salida,
     ]
     subprocess.run(comando, capture_output=True)
     
     for temp in [video_temp, audio_temp, ruta_intro, ruta_outro, ruta_intro_alarma, ruta_outro_silencio, ruta_ambiente, audio_con_ambiente]:
-        if os.path.exists(temp): os.remove(temp)
+        if os.path.exists(temp):
+            os.remove(temp)
     return ruta_salida
