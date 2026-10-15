@@ -3,83 +3,119 @@ import sys
 import time
 import base64
 import requests
+import urllib.parse
 import re
-import pytesseract
-from PIL import Image
 
 ESTILO_BASE = (
-    "cinematic lighting, highly detailed 3D render, dark atmospheric background, "
-    "Unreal Engine 5 style, pristine empty environment, pure visual art, unmarked surfaces"
+    "pure abstract cinematic composition, highly detailed, dramatic studio lighting, "
+    "dark background with glowing accents, macro photography, depth of field, "
+    "ABSOLUTELY NO TEXT, NO NUMBERS, NO DIALS, NO GAUGES, NO DASHBOARD, NO WORDS, NO LETTERS, empty space"
 )
 
 PALABRAS_A_EVITAR = [
-    "text", "words", "letters", "labels", "numbers", "diagram", "infographic", 
-    "person", "face", "sign", "document", "panel", "dashboard", "hud", "screen"
+    "dashboard", "hud", "interface", "display", "screen", "text", "numbers", 
+    "data", "panel", "dial", "gauge", "cockpit", "monitor", "radar", "map", 
+    "document", "checklist", "words", "letters", "labels", "diagram", "infographic"
 ]
 
 def _limpiar_prompt(prompt: str) -> str:
-    p = prompt
+    prompt_limpio = prompt
     for palabra in PALABRAS_A_EVITAR:
-        p = re.sub(rf'\b{palabra}\b', '', p, flags=re.IGNORECASE)
-    return re.sub(r'\s+', ' ', p).strip()
+        prompt_limpio = re.sub(rf"\b{palabra}\b", "", prompt_limpio, flags=re.IGNORECASE)
+    return prompt_limpio.strip()
 
-def _contiene_texto_alienigena(ruta_imagen: str) -> bool:
+TIMEOUT = 30
+TAMANO_MINIMO_BYTES = 10_000
+_cloudflare_agotado = [False]
+_ultima_fue_emergencia = [False]
+
+def _validar_imagen(ruta: str) -> bool:
+    if not os.path.exists(ruta): return False
+    if os.path.getsize(ruta) < TAMANO_MINIMO_BYTES: return False
+    with open(ruta, "rb") as f: cabecera = f.read(8)
+    return cabecera.startswith(b"\x89PNG") or cabecera.startswith(b"\xff\xd8\xff")
+
+def _tiene_texto_alienigena(ruta: str) -> bool:
+    """Detecta mediante OCR si la IA ha colado texto falso en la imagen."""
     try:
-        texto = pytesseract.image_to_string(Image.open(ruta_imagen))
-        # Solo descarta si encuentra palabras alienígenas de 4 o más letras. Ignora manchas sueltas.
-        matches = re.findall(r'[A-Za-z]{4,}', texto)
-        return len(matches) > 0
-    except Exception as e:
-        return False
+        import pytesseract
+        from PIL import Image
+        texto = pytesseract.image_to_string(Image.open(ruta))
+        letras = re.findall(r'[A-Za-z0-9]{3,}', texto)
+        if len(letras) >= 2:
+            print("  ⚠️ [OCR] Texto alienígena detectado. Descartando...")
+            return True
+    except Exception:
+        pass
+    return False
 
 def _intentar_cloudflare(prompt_completo: str, ruta_salida: str) -> bool:
+    if _cloudflare_agotado[0]: return False
     account_id = os.environ.get("CF_ACCOUNT_ID")
     api_token = os.environ.get("CF_API_TOKEN")
     if not account_id or not api_token: return False
-    
     headers = {"Authorization": f"Bearer {api_token}"}
-    modelos_cf = [
-        "@cf/black-forest-labs/flux-1-schnell",
-        "@cf/stabilityai/stable-diffusion-xl-base-1.0"
-    ]
-    
-    for modelo in modelos_cf:
-        url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{modelo}"
-        try:
-            # Pausa OBLIGATORIA de 6 segundos para evitar el bloqueo "Read timed out"
-            time.sleep(6)
-            resp = requests.post(url, headers=headers, json={"prompt": prompt_completo}, timeout=50)
-            
-            if resp.status_code == 200:
-                content_type = resp.headers.get("Content-Type", "")
-                if "image/" in content_type:
-                    with open(ruta_salida, "wb") as f: f.write(resp.content)
-                else:
-                    b64_img = resp.json().get("result", {}).get("image")
-                    if b64_img:
-                        with open(ruta_salida, "wb") as f: f.write(base64.b64decode(b64_img))
-                
-                if os.path.exists(ruta_salida) and os.path.getsize(ruta_salida) > 10000:
-                    if _contiene_texto_alienigena(ruta_salida):
-                        print(f"  ⚠️ [OCR] Texto alienígena detectado. Descartando...")
-                        os.remove(ruta_salida)
-                        continue
+    url_schnell = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/black-forest-labs/flux-1-schnell"
+    try:
+        resp = requests.post(url_schnell, headers=headers, json={"prompt": prompt_completo, "steps": 8}, timeout=TIMEOUT)
+        if resp.status_code == 200:
+            b64_img = resp.json().get("result", {}).get("image")
+            if b64_img:
+                with open(ruta_salida, "wb") as f: f.write(base64.b64decode(b64_img))
+                if _validar_imagen(ruta_salida) and not _tiene_texto_alienigena(ruta_salida):
                     return True
-            else:
-                print(f"  [AVISO] CF devolvió código {resp.status_code}")
-        except requests.RequestException as e:
-            print(f"  [AVISO] Timeout de Cloudflare. Reintentando...")
-            time.sleep(5)
+        if resp.status_code == 429:
+            _cloudflare_agotado[0] = True
+    except requests.Timeout:
+        print("  [AVISO] Timeout de Cloudflare. Reintentando...")
+    except requests.RequestException:
+        pass
     return False
 
-def generar_imagen(prompt_escena: str, ruta_salida: str) -> bool:
+def _intentar_pollinations(prompt_completo: str, ruta_salida: str, semilla: int = 42) -> bool:
+    try:
+        prompt_url = urllib.parse.quote(prompt_completo)
+        url = f"https://image.pollinations.ai/prompt/{prompt_url}?width=1024&height=1024&seed={semilla}&nologo=true"
+        resp = requests.get(url, timeout=TIMEOUT)
+        if resp.status_code == 200:
+            with open(ruta_salida, "wb") as f: f.write(resp.content)
+            if _validar_imagen(ruta_salida) and not _tiene_texto_alienigena(ruta_salida):
+                return True
+    except Exception:
+        pass
+    return False
+
+def _generar_imagen_emergencia(ruta_salida: str, semilla: int = 0) -> bool:
+    import subprocess
+    color_fondo = "0x0A0F1A"
+    filtro = f"color=c={color_fondo}:s=1024x1024:d=1,drawgrid=w=50:h=50:t=1:c=0x1B2A4A,noise=alls=10:allf=t+u"
+    comando = ["ffmpeg", "-y", "-f", "lavfi", "-i", filtro, "-frames:v", "1", "-update", "1", ruta_salida]
+    resultado = subprocess.run(comando, capture_output=True, text=True)
+    return resultado.returncode == 0 and os.path.exists(ruta_salida)
+
+def fue_ultima_generacion_emergencia() -> bool:
+    return _ultima_fue_emergencia[0]
+
+def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) -> bool:
+    os.makedirs(os.path.dirname(os.path.abspath(ruta_salida)), exist_ok=True)
     sujeto = _limpiar_prompt(prompt_escena)
     prompt_completo = f"{sujeto}, {ESTILO_BASE}"
+    _ultima_fue_emergencia[0] = False
+    seed_base = semilla if semilla is not None else abs(hash(prompt_escena)) % 10000
     
-    for intento in range(2):
+    for intento_cf in range(2):
         if _intentar_cloudflare(prompt_completo, ruta_salida):
             return True
-            
+        if intento_cf == 0:
+            time.sleep(2)
+        
+    for intento_pol in range(2):
+        if _intentar_pollinations(prompt_completo, ruta_salida, seed_base + intento_pol):
+            return True
+    
+    if _generar_imagen_emergencia(ruta_salida, seed_base):
+        _ultima_fue_emergencia[0] = True
+        return True
     return False
 
 if __name__ == "__main__":
