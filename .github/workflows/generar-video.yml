@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       titulo:
-        description: "Título/tema del vídeo (ej: El misterio del MH370)"
+        description: "Título/tema del vídeo (ej: Aeroperú 603: el vuelo que voló ciego)"
         required: true
         type: string
 
@@ -17,19 +17,16 @@ jobs:
       - name: Checkout del repo
         uses: actions/checkout@v4
 
-      - name: Instalar Dependencias del Sistema (FFmpeg y OCR)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg tesseract-ocr tesseract-ocr-eng
-
-      - name: Instalar Python y Librerías
+      - name: Instalar Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Instalar paquetes Python
-        # Añadido pytesseract y Pillow para visión artificial
-        run: pip install requests groq openai edge-tts gradio_client pytesseract Pillow
+      - name: Instalar FFmpeg y Tesseract OCR
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg tesseract-ocr
+
+      - name: Instalar dependencias Python
+        run: pip install requests groq openai edge-tts gradio_client pillow pytesseract
 
       - name: Ejecutar pipeline completo
         env:
@@ -37,6 +34,9 @@ jobs:
           CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
         run: python pipeline_auto.py "${{ inputs.titulo }}"
 
       - name: Subir video final
@@ -49,4 +49,5 @@ jobs:
             proyecto/miniatura.png
             proyecto/metadata_youtube.txt
             proyecto/guion.json
+            proyecto/imagenes/
           retention-days: 21
