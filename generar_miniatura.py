@@ -2,36 +2,34 @@ import subprocess
 import os
 
 def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, ruta_salida: str):
-    texto_seguro = titulo_corto[:35].upper().replace("\\", "").replace(":", "").replace("'", "").replace('"', "").strip()
-    
-    palabras = texto_seguro.split()
-    if len(palabras) > 2 and len(texto_seguro) > 15:
-        mitad = len(palabras) // 2
-        linea1, linea2 = " ".join(palabras[:mitad]), " ".join(palabras[mitad:])
-    else:
-        linea1, linea2 = texto_seguro, ""
-
-    # Cálculo dinámico estricto: Si la línea es larguísima, la fuente baja drásticamente
-    fs1 = min(150, max(70, int(1500 / max(len(linea1), 1))))
-    fs2 = min(150, max(70, int(1500 / max(len(linea2), 1)))) if linea2 else 150
-
-    filtro = "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,vignette=angle=PI/2.5"
-    
-    filtro += (
-        f",drawtext=text='{linea1}':fontcolor=#FFE800:fontsize={fs1}:"
-        f"font='DejaVu Sans Bold':borderw=12:bordercolor=black@1.0:"
-        f"shadowcolor=black@1.0:shadowx=12:shadowy=12:"
-        f"x=(w-text_w)/2:y=h-text_h-180"
-    )
-    if linea2:
-        filtro += (
-            f",drawtext=text='{linea2}':fontcolor=#FFE800:fontsize={fs2}:"
-            f"font='DejaVu Sans Bold':borderw=12:bordercolor=black@1.0:"
-            f"shadowcolor=black@1.0:shadowx=12:shadowy=12:"
-            f"x=(w-text_w)/2:y=h-text_h-40"
-        )
-    else:
-        filtro = filtro.replace("y=h-text_h-180", "y=h-text_h-100")
+    if not os.path.exists(ruta_imagen_base): 
+        raise RuntimeError(f"No existe imagen base: {ruta_imagen_base}")
         
-    subprocess.run(["ffmpeg", "-y", "-i", ruta_imagen_base, "-vf", filtro, "-frames:v", "1", "-q:v", "2", ruta_salida])
+    os.makedirs(os.path.dirname(os.path.abspath(ruta_salida)), exist_ok=True)
+    texto_seguro = titulo_corto[:30].upper().replace("\\", "").replace(":", "").replace("'", "").replace('"', "")
+    ancho_util = 1200
+    fontsize = min(150, max(85, int(ancho_util / (max(len(texto_seguro), 1) * 0.55))))
+    
+    filtro = (
+        "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,"
+        "vignette=angle=PI/3:mode=backward,"
+        "drawbox=x=0:y=0:w=1280:h=30:color=black@0.9:t=fill,"
+        "drawbox=x=0:y=690:w=1280:h=30:color=black@0.9:t=fill,"
+        "drawbox=x=0:y=h-220:w=1280:h=220:color=black@0.6:t=fill,"
+        f"drawtext=text='{texto_seguro}':fontcolor=#FFE800:fontsize={fontsize}:"
+        f"font='DejaVu Sans Bold':borderw=10:bordercolor=black@1.0:"
+        f"shadowcolor=black@0.9:shadowx=12:shadowy=12:"
+        f"x=(w-text_w)/2:y=h-(text_h+50)"
+    )
+    
+    comando = [
+        "ffmpeg", "-y", "-i", ruta_imagen_base,
+        "-vf", filtro, "-frames:v", "1", "-update", "1", "-q:v", "2",
+        ruta_salida
+    ]
+    
+    resultado = subprocess.run(comando, capture_output=True, text=True)
+    if resultado.returncode != 0 or not os.path.exists(ruta_salida):
+        raise RuntimeError(f"Fallo generando la miniatura:\n{resultado.stderr[-600:]}")
+    
     return ruta_salida
