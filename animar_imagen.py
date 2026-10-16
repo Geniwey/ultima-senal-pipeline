@@ -10,52 +10,52 @@ VARIANTES = [
     {"zoom_inicial": 1.2, "zoom_final": 1.05, "pan_x": "iw-iw/zoom", "pan_y": "ih-ih/zoom"},
 ]
 
+
 def animar_imagen(ruta_imagen: str, duracion_segundos: float, ruta_salida: str, indice_variante: int, texto_pantalla: str = None):
-    # BLINDAJE CRÍTICO: Crear siempre la carpeta de destino antes de llamar a FFmpeg
     carpeta_destino = os.path.dirname(os.path.abspath(ruta_salida))
     os.makedirs(carpeta_destino, exist_ok=True)
 
     if os.path.exists(ruta_salida) and os.path.getsize(ruta_salida) > 10_000:
         return ruta_salida
-        
+
     variante = VARIANTES[indice_variante % len(VARIANTES)]
     num_frames = max(int(duracion_segundos * FPS), FPS)
     z_ini, z_fin = variante["zoom_inicial"], variante["zoom_final"]
     incremento = (z_fin - z_ini) / num_frames
-    
+
     filtro_normalizar = f"scale={ANCHO}:{ALTO}:force_original_aspect_ratio=increase,crop={ANCHO}:{ALTO},setsar=1"
     filtro_zoompan = f"{filtro_normalizar},zoompan=z='{z_ini}+{incremento}*on':x='{variante['pan_x']}':y='{variante['pan_y']}':d={num_frames}:s={ANCHO}x{ALTO}:fps={FPS}"
-    
+
     filtros = [filtro_zoompan, "vignette=angle=PI/4"]
-    
+
     if texto_pantalla:
         texto_seguro = (
             texto_pantalla.upper()
             .replace("\\", "")
-            .replace(":", " ")
+            .replace(":", " -")
             .replace("'", "")
             .replace('"', "")
             .replace("%", "")
         )
+        # Caja oscura translúcida (black@0.68) para garantizar legibilidad sobre cualquier fondo claro u oscuro
         filtros.append(
-            f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize=80:"
-            f"font='DejaVu Sans Bold':borderw=4:bordercolor=black@0.9:"
-            f"shadowcolor=black@0.8:shadowx=5:shadowy=5:"
-            f"x=(w-text_w)/2:y=h-text_h-120:"
+            f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize=68:"
+            f"font='DejaVu Sans Bold':borderw=3:bordercolor=black@0.9:"
+            f"box=1:boxcolor=black@0.68:boxborderw=18:"
+            f"x=(w-text_w)/2:y=h-text_h-110:"
             f"alpha='if(lt(t,0.3),t/0.3,1)'"
         )
-        
+
     comando = [
         "ffmpeg", "-y", "-loop", "1", "-i", ruta_imagen,
         "-vf", ",".join(filtros),
         "-t", str(duracion_segundos),
         "-r", str(FPS),
         "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
-        ruta_salida
+        ruta_salida,
     ]
     resultado = subprocess.run(comando, capture_output=True, text=True)
-    
-    # Si por cualquier motivo falla el filtro complejo, hacemos un render estático de respaldo para no perder jamás la escena
+
     if resultado.returncode != 0 or not os.path.exists(ruta_salida) or os.path.getsize(ruta_salida) < 1000:
         print(f" [Aviso] Reintentando animación simplificada para {os.path.basename(ruta_salida)}...")
         comando_simple = [
@@ -64,11 +64,12 @@ def animar_imagen(ruta_imagen: str, duracion_segundos: float, ruta_salida: str, 
             "-t", str(duracion_segundos),
             "-r", str(FPS),
             "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
-            ruta_salida
+            ruta_salida,
         ]
         subprocess.run(comando_simple, capture_output=True, text=True)
 
     return ruta_salida
+
 
 def animar_todas(info_escenas: list, carpeta_imagenes: str, carpeta_salida: str):
     os.makedirs(carpeta_salida, exist_ok=True)
