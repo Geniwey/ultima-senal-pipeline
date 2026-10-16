@@ -33,7 +33,7 @@ def _obtener_fuente(tamano: int) -> ImageFont.FreeTypeFont:
 
 def _aplicar_vineta_y_degradado(imagen: Image.Image) -> Image.Image:
     """Aplica oscurecimiento suave en los bordes y un degradado progresivo inferior sin cortes rectos."""
-     base = imagen.convert("RGBA")
+    base = imagen.convert("RGBA")
     capa_oscura = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
     draw = ImageDraw.Draw(capa_oscura)
 
@@ -110,8 +110,22 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
 
     x_cursor = x_inicial
     for i, palabra in enumerate(palabras):
-        draw_sombra_amplia.text((x_cursor, y_pos + 10), palabra, font=fuente, fill=(0, 0, 0, 255), stroke_width=14, stroke_fill=(0, 0, 0, 255))
-        draw_sombra_corta.text((x_cursor, y_pos + 6), palabra, font=fuente, fill=(0, 0, 0, 230), stroke_width=6, stroke_fill=(0, 0, 0, 230))
+        draw_sombra_amplia.text(
+            (x_cursor, y_pos + 10),
+            palabra,
+            font=fuente,
+            fill=(0, 0, 0, 255),
+            stroke_width=14,
+            stroke_fill=(0, 0, 0, 255),
+        )
+        draw_sombra_corta.text(
+            (x_cursor, y_pos + 6),
+            palabra,
+            font=fuente,
+            fill=(0, 0, 0, 230),
+            stroke_width=6,
+            stroke_fill=(0, 0, 0, 230),
+        )
         x_cursor += anchos_palabras[i] + espacio
 
     capa_sombra_amplia = capa_sombra_amplia.filter(ImageFilter.GaussianBlur(radius=18))
@@ -120,7 +134,7 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
     lienzo = Image.alpha_composite(lienzo, capa_sombra_amplia)
     lienzo = Image.alpha_composite(lienzo, capa_sombra_corta)
 
-    # 5. Dibujar trazo exterior fino de precisión (3px) y máscaras para el degradado interior
+    # 5. Dibujar trazo exterior fino de precisión (4px) y máscaras para el degradado interior
     capa_trazo = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
     draw_trazo = ImageDraw.Draw(capa_trazo)
 
@@ -132,7 +146,14 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
 
     x_cursor = x_inicial
     for i, palabra in enumerate(palabras):
-        draw_trazo.text((x_cursor, y_pos), palabra, font=fuente, fill=(0, 0, 0, 255), stroke_width=4, stroke_fill=(10, 10, 10, 255))
+        draw_trazo.text(
+            (x_cursor, y_pos),
+            palabra,
+            font=fuente,
+            fill=(0, 0, 0, 255),
+            stroke_width=4,
+            stroke_fill=(10, 10, 10, 255),
+        )
         if len(palabras) > 1 and i < len(palabras) - 1:
             draw_blanca.text((x_cursor, y_pos), palabra, font=fuente, fill=255)
         else:
