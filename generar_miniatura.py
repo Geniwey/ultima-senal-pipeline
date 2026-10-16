@@ -1,6 +1,7 @@
 import os
 import urllib.request
-from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps, ImageEnhance
+from generar_imagen import _detectar_y_limpiar_texto_ocr
 
 ANCHO, ALTO = 1280, 720
 URL_FUENTE_ANTON = "https://raw.githubusercontent.com/google/fonts/main/ofl/anton/Anton-Regular.ttf"
@@ -31,23 +32,21 @@ def _obtener_fuente(tamano: int) -> ImageFont.FreeTypeFont:
     return ImageFont.load_default()
 
 
-def _aplicar_vineta_y_degradado(imagen: Image.Image) -> Image.Image:
-    """Aplica oscurecimiento suave en los bordes y un degradado progresivo inferior sin cortes rectos."""
-    base = imagen.convert("RGBA")
+def _realzar_iluminacion_y_degradado(imagen: Image.Image) -> Image.Image:
+    """Sube el brillo y contraste para móviles y aplica un degradado inferior suave para el texto."""
+    # Subir brillo (+28%) y contraste (+15%) para que la imagen nunca quede demasiado oscura en el feed
+    img_iluminada = ImageEnhance.Brightness(imagen).enhance(1.28)
+    img_iluminada = ImageEnhance.Contrast(img_iluminada).enhance(1.15)
+    base = img_iluminada.convert("RGBA")
+
     capa_oscura = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
     draw = ImageDraw.Draw(capa_oscura)
 
-    # Degradado inferior suave (del píxel 320 al 720) para que las letras destaquen al máximo
-    inicio_y = 320
+    # Degradado inferior suave (del píxel 380 al 720) para que las letras destaquen sin oscurecer el centro
+    inicio_y = 380
     for y in range(inicio_y, ALTO):
         progreso = (y - inicio_y) / (ALTO - inicio_y)
-        alpha = int(225 * (progreso ** 1.5))
-        draw.line([(0, y), (ANCHO, y)], fill=(0, 0, 0, alpha))
-
-    # Degradado superior sutil para dar atmósfera de cine
-    for y in range(0, 120):
-        progreso = 1.0 - (y / 120.0)
-        alpha = int(130 * (progreso ** 1.6))
+        alpha = int(220 * (progreso ** 1.6))
         draw.line([(0, y), (ANCHO, y)], fill=(0, 0, 0, alpha))
 
     return Image.alpha_composite(base, capa_oscura)
@@ -72,17 +71,22 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
 
     os.makedirs(os.path.dirname(os.path.abspath(ruta_salida)), exist_ok=True)
 
-    # 1. Cargar y ajustar a 1280x720 exactos
+    # Paso 0: Limpiar cualquier texto alienígena residual (como 'ETTEY' o 'FLACT') en la imagen base
+    _detectar_y_limpiar_texto_ocr(ruta_imagen_base, tapar_si_falla=True)
+
+    # 1. Cargar, encuadrar a 1280x720 y dar más brillo para pantallas móviles
     img_original = Image.open(ruta_imagen_base).convert("RGB")
     lienzo = ImageOps.fit(img_original, (ANCHO, ALTO), method=Image.Resampling.LANCZOS)
-    lienzo = _aplicar_vineta_y_degradado(lienzo)
+    lienzo = _realzar_iluminacion_y_degradado(lienzo)
 
-    # 2. Preparar palabras (las primeras en Blanco Perlado, la última en Amarillo Ámbar de alto CTR)
+    # 2. Preparar palabras (evitando el título genérico de ejemplo)
     texto_limpio = titulo_corto[:32].upper().replace("\\", "").replace(":", "").replace("'", "").replace('"', "").strip()
-    palabras = texto_limpio.split() if texto_limpio else ["MISTERIO", "AÉREO"]
+    if not texto_limpio or "FALLO FATAL" in texto_limpio:
+        texto_limpio = "¿VOLARON CIEGOS?"
+    palabras = texto_limpio.split()
 
-    # 3. Ajustar tamaño de fuente dinámicamente para que ocupe el ancho óptimo sin salirse
-    tamano_fuente = 148
+    # 3. Ajustar tamaño de fuente dinámicamente
+    tamano_fuente = 152
     margen_maximo = 1140
     dummy_draw = ImageDraw.Draw(lienzo)
 
@@ -95,13 +99,12 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
             break
         tamano_fuente -= 4
 
-    # Calcular posición vertical e inicio horizontal centrado
     bbox_ref = dummy_draw.textbbox((0, 0), texto_limpio, font=fuente)
     alto_texto = bbox_ref[3] - bbox_ref[1]
     x_inicial = (ANCHO - ancho_total) // 2
     y_pos = ALTO - alto_texto - 75 - bbox_ref[1]
 
-    # 4. Crear Sombra Difuminada Real (Gaussian Blur en 2 capas, cero efecto PowerPoint)
+    # 4. Sombra Difuminada Real (Gaussian Blur en 2 capas)
     capa_sombra_amplia = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
     draw_sombra_amplia = ImageDraw.Draw(capa_sombra_amplia)
 
@@ -134,7 +137,7 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
     lienzo = Image.alpha_composite(lienzo, capa_sombra_amplia)
     lienzo = Image.alpha_composite(lienzo, capa_sombra_corta)
 
-    # 5. Dibujar trazo exterior fino de precisión (4px) y máscaras para el degradado interior
+    # 5. Trazo exterior fino y máscaras para el degradado interior
     capa_trazo = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
     draw_trazo = ImageDraw.Draw(capa_trazo)
 
@@ -162,7 +165,7 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
 
     lienzo = Image.alpha_composite(lienzo, capa_trazo)
 
-    # 6. Rellenar las letras con degradado metálico vertical (Blanco Plata + Amarillo Ámbar)
+    # 6. Rellenar letras con degradado metálico vertical (Blanco Plata + Amarillo Ámbar)
     y_top = max(0, ALTO - alto_texto - 90)
     alto_grad = min(ALTO - y_top, alto_texto + 60)
 
