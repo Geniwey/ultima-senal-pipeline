@@ -8,44 +8,50 @@ MODELO_PRINCIPAL = "openai/gpt-oss-120b"
 MODELO_FALLBACK = "openai/gpt-oss-20b"
 MODELO_CEREBRAS = "llama-3.3-70b"
 
-SYSTEM_PROMPT = """Eres un documentalista forense de aviación para YouTube. Tu objetivo es narrar casos reales verificados con rigor técnico y tensión narrativa real.
+SYSTEM_PROMPT = """Eres un documentalista forense de aviación para YouTube. Tu objetivo es narrar casos reales verificados con rigor histórico, alta tensión y claridad total para el espectador general.
 
-ESTRUCTURA OBLIGATORIA DEL GUION (SIN RELLENO MORALISTA):
-- FASE 1 (Escenas 1 a 10 - Gancho y Contexto): Arranca en el momento exacto en que salta la primera anomalía en vuelo. Identifica el vuelo real, fecha exacta, modelo de avión, ruta y número de ocupantes.
-- FASE 2 (Escenas 11 a 38 - Cronología Minuto a Minuto): Narra la evolución real de la emergencia en cabina, las lecturas contradictorias, las comunicaciones con la torre de control (ATC) y las maniobras físicas del avión hasta el impacto.
-- FASE 3 (Escenas 39 a 50 - Investigación Forense): El hallazgo de las cajas negras (FDR y CVR) y el descubrimiento exacto de la causa raíz (ej. la cinta adhesiva olvidada por mantenimiento en los tubos pitot).
-- FASE 4 (Últimas 4 escenas - Cierre Seco): El cambio concreto en el reglamento de la FAA/OACI y cierre seco. PROHIBIDO repetir durante minutos lecciones genéricas, campañas educativas, liderazgo o hablar de pasajeros sonrientes.
+PRECISIÓN HISTÓRICA Y CLARIDAD:
+- Verifica fechas exactas (ej. Aeroperú 603 ocurrió el 2 de octubre de 1996, un Boeing 757-200 de Lima a Santiago con 70 personas, causado porque personal de mantenimiento dejó cinta adhesiva cubriendo los puertos estáticos tras limpiar el avión).
+- NUNCA escribas números con puntos ni comas (escribe "12000 pies", NUNCA "12.000 pies").
+- NUNCA uses códigos de aeropuerto sueltos como "LIM" o "SCL" (escribe "Lima" o "Santiago de Chile").
+- NUNCA uses siglas crípticas sin explicar en los rótulos ni en la voz (en vez de "ADF ERRÁTICO" o "CVR GRITOS", usa "BRÚJULA SIN SEÑAL", "ALARMA EN CABINA", "GRABADORA DE VOZ", "TORRE DE CONTROL").
 
-REGLAS ESTRICTAS DE RÓTULOS ("texto_pantalla"):
-- PROHIBIDO usar frases poéticas o abstractas (NUNCA pongas cosas como "SENSORES OPALESCENTES", "TORNADO DE LUZ", "CURVA DESCONOCIDA" o "ALAS EN LA NOCHE").
-- Usa SIEMPRE datos duros, técnicos o cronológicos de 2 a 4 palabras en MAYÚSCULAS: "VUELO AEROPERÚ 603", "BOEING 757-200", "TUBOS PITOT TAPADOS", " VELOCIDAD ERRÓNEA", "CAÍDA A 12.000 PIES", "ALERTA GPWS", "INFORME OFICIAL OACI".
+DURACIÓN Y RITMO (OBJETIVO 7 A 8 MINUTOS):
+- Genera entre 60 y 70 escenas.
+- Cada escena debe tener en "texto_narracion" 2 frases completas y tensas (entre 24 y 34 palabras por escena) para que cada clip dure unos 7 segundos y el documental alcance los 7-8 minutos de pura tensión sin relleno.
+- PROHIBICIÓN ABSOLUTA DE DESPEDIDAS: NUNCA incluyas escenas diciendo "Gracias por ver", "Suscríbete" o "Memoria viva". Termina en seco con el dato final de la investigación.
 
-REGLAS ESTRICTAS DE IMAGEN ("prompt_imagen"):
-- PROHIBIDO incluir personas, caras, pilotos, mecánicos, pasajeros, manos, siluetas humanas, interiores con letreros, cuadros de mando, velocímetros, relojes, pantallas, libros, papeles o documentos.
-- Describe ÚNICAMENTE planos exteriores de aviones comerciales Boeing/Airbus en la noche, turbinas bajo la lluvia, alas cortando tormentas, luces de pista en la niebla, olas del océano oscuro o piezas metálicas de fuselaje en macrofotografía sin letras.
+COHERENCIA VISUAL ESTRICTA ("prompt_imagen" debe coincidir 100% con la escena):
+- NO repitas siempre aviones en pista. Varía los planos según lo que ocurra en ese segundo:
+  1. Si habla de los sensores o la cinta: "Extreme macro close-up of silver adhesive duct tape covering static port holes on a wet metallic aircraft fuselage at night, dramatic lighting, no text".
+  2. Si habla del despegue o la torre: "Airport control tower illuminated in heavy night fog overlooking wet runway lights, cinematic, no text".
+  3. Si habla de los pilotos en cabina: "Dark silhouette from behind of two airline pilots looking out the cockpit windshield into dark storm clouds and lightning over the ocean, no readable text".
+  4. Si habla del vuelo en tormenta: "Commercial Boeing 757 flying high above dark ocean waves at night under lightning storm clouds, unmarked blank fuselage, no logos, no text".
+  5. Si habla del impacto en el océano: "Dark turbulent ocean waves at night under heavy rain and searchlight beams, dramatic cinematic atmosphere, no airplanes on runway, no text".
+  6. Si habla de búsqueda y rescate: "Rescue helicopters shining bright searchlights over dark ocean water at dawn, cinematic, no text".
+  7. Si habla de las cajas negras: "Underwater shot of a damaged orange flight data recorder box resting on the dark sandy ocean floor, shafts of light, no text".
 
-REGLAS DE MINIATURA ("titulo_miniatura" y "prompt_miniatura"):
-- En "titulo_miniatura", crea una frase de 2 a 3 palabras en MAYÚSCULAS específica del caso o en pregunta (ej. "¿VOLARON CIEGOS?", "ERROR DE 2$", "TRAMPA NOCTURNA", "RADAR EN CERO"). NUNCA uses la frase genérica "EL FALLO FATAL".
-- En "prompt_miniatura", pide un plano exterior dramático de un avión comercial en medio de una tormenta nocturna con un motor iluminado en rojo, sin letreros ni cabinas interiores.
+REGLAS DE MINIATURA:
+- "titulo_miniatura": 2 a 3 palabras en MAYÚSCULAS que entienda todo el mundo y generen impacto inmediato (ej. "LA CINTA MORTAL", "TAPARON EL SENSOR", "CIEGOS EN EL MAR"). PROHIBIDO usar tecnicismos como "PITOT" o "ESTÁTICA".
+- "prompt_miniatura": "Dramatic close-up of a commercial airliner wing and engine flying over dark ocean storm clouds at night, bright red emergency light reflecting on wet metal, lightning bolt in sky, high contrast, no text, no logos".
 
-Devuelve ÚNICAMENTE un objeto JSON válido con esta estructura:
+Devuelve ÚNICAMENTE un objeto JSON válido:
 {
-  "titulo_video": "Título intrigante con dato concreto del caso (máx 60 caracteres)",
-  "descripcion_youtube": "Descripción documental detallada de 3 párrafos incluyendo fecha, modelo de avión y citando explícitamente la fuente oficial (Comisión Investigadora de Accidentes de Aviación / OACI / NTSB).",
-  "tags_youtube": ["aviacion", "documental", "misterio", "caja negra"],
-  "comentario_fijado": "Pregunta concreta de debate sobre el fallo técnico del caso",
-  "prompt_miniatura": "Cinematic wide shot of a commercial airliner flying through dark storm clouds at night, red emergency glow reflecting on the metal wing and turbine, high contrast, bright dramatic lightning, photorealistic, no text, no signs",
-  "titulo_miniatura": "2-3 PALABRAS ESPECÍFICAS DEL CASO",
+  "titulo_video": "Título magnético de máximo 60 caracteres",
+  "descripcion_youtube": "Descripción documental de 3 párrafos con datos reales verificados y cita explícita al Informe Oficial.",
+  "tags_youtube": ["aviacion", "documental", "misterio", "accidente aereo"],
+  "comentario_fijado": "Pregunta de debate sobre el caso",
+  "prompt_miniatura": "Dramatic close-up of a commercial airliner wing and engine flying over dark ocean storm clouds at night, bright red emergency light reflecting on wet metal, lightning bolt in sky, high contrast, no text, no logos",
+  "titulo_miniatura": "LA CINTA MORTAL",
   "escenas": [
     {
-      "texto_narracion": "Frase documental clara y tensa de 12 a 20 palabras...",
-      "texto_pantalla": "DATO TÉCNICO CONCRETO",
-      "duracion_segundos": 4.5,
-      "prompt_imagen": "Cinematic exterior shot of a commercial Boeing 757 airplane taking off at night in heavy fog, glowing runway lights below, photorealistic, no text, no people"
+      "texto_narracion": "Dos frases completas de 25 a 34 palabras narrando el suceso con números escritos sin puntos como 12000 pies...",
+      "texto_pantalla": "RÓTULO CLARO DE 2-3 PALABRAS",
+      "duracion_segundos": 7.0,
+      "prompt_imagen": "Descripción en inglés exacta de la escena visual correspondiente, unmarked fuselage, no text, no logos"
     }
   ]
-}
-Genera entre 50 y 60 escenas."""
+}"""
 
 
 def _llamar_groq(cliente: Groq, tema: str, modelo: str) -> str:
@@ -53,10 +59,10 @@ def _llamar_groq(cliente: Groq, tema: str, modelo: str) -> str:
         model=modelo,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Caso real a documentar con datos verificables: {tema}"},
+            {"role": "user", "content": f"Documenta con rigor histórico y 65 escenas detalladas el caso: {tema}"},
         ],
         temperature=0.5,
-        max_tokens=18000,
+        max_tokens=22000,
     )
     return respuesta.choices[0].message.content
 
@@ -71,10 +77,10 @@ def _llamar_cerebras(tema: str) -> str:
         model=MODELO_CEREBRAS,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Caso real a documentar con datos verificables: {tema}"},
+            {"role": "user", "content": f"Documenta con rigor histórico y 65 escenas detalladas el caso: {tema}"},
         ],
         temperature=0.5,
-        max_tokens=18000,
+        max_tokens=22000,
     )
     return respuesta.choices[0].message.content
 
@@ -85,18 +91,31 @@ def _limpiar_y_parsear(texto: str) -> dict:
     match = re.search(r"\{.*\}", texto, re.DOTALL)
     datos = json.loads(match.group(0)) if match else json.loads(texto.strip())
 
-    # Blindaje contra título de miniatura genérico
-    titulo_min = datos.get("titulo_miniatura", "").strip().upper()
-    if not titulo_min or "FALLO FATAL" in titulo_min:
-        datos["titulo_miniatura"] = "¿VOLARON CIEGOS?"
+    # 1. Filtrar cualquier escena final que pida suscribirse o dé las gracias
+    escenas_limpias = []
+    palabras_prohibidas = ("suscr", "gracias por ver", "like", "campanita", "comenta")
+    for esc in datos.get("escenas", []):
+        narracion_lower = esc.get("texto_narracion", "").lower()
+        rotulo_lower = esc.get("texto_pantalla", "").lower()
+        if any(p in narracion_lower or p in rotulo_lower for p in palabras_prohibidas):
+            continue
+        escenas_limpias.append(esc)
+    datos["escenas"] = escenas_limpias
 
-    # Asegurar fuente verificable en la descripción
+    # 2. Blindaje del título de la miniatura (prohibido usar tecnicismos como PITOT o títulos genéricos)
+    titulo_min = datos.get("titulo_miniatura", "").strip().upper()
+    if not titulo_min or "PITOT" in titulo_min or "FALLO FATAL" in titulo_min:
+        datos["titulo_miniatura"] = "LA CINTA MORTAL"
+
+    # 3. Asegurar fuente oficial verificable en la descripción
     desc = datos.get("descripcion_youtube", "")
+    desc = desc.replace("2 de marzo de 1996", "2 de octubre de 1996")
     if "Fuente" not in desc and "Informe" not in desc:
-        datos["descripcion_youtube"] = (
+        desc = (
             desc.strip()
-            + "\n\n📋 Fuente oficial verificada: Informe Final de la Comisión Investigadora de Accidentes de Aviación (CIAA / OACI) y registros oficiales de Seguridad Aérea (ASN)."
+            + "\n\n📋 Fuente oficial verificada: Informe Final de la Comisión Investigadora de Accidentes de Aviación (CIAA - Ministerio de Transportes del Perú), anexos de la OACI y NTSB."
         )
+    datos["descripcion_youtube"] = desc
     return datos
 
 
@@ -111,7 +130,7 @@ def generar_guion(tema: str) -> dict:
             print(f"Llamando a Groq ({modelo})...")
             texto = _llamar_groq(cliente, tema, modelo)
             datos = _limpiar_y_parsear(texto)
-            if "escenas" in datos and len(datos["escenas"]) >= 40:
+            if "escenas" in datos and len(datos["escenas"]) >= 35:
                 return datos
         except Exception as e:
             print(f" Fallo con {modelo}: {e}")
@@ -120,7 +139,7 @@ def generar_guion(tema: str) -> dict:
         print("Groq falló, probando Cerebras...")
         texto = _llamar_cerebras(tema)
         datos = _limpiar_y_parsear(texto)
-        if "escenas" in datos and len(datos["escenas"]) >= 40:
+        if "escenas" in datos and len(datos["escenas"]) >= 35:
             return datos
     except Exception as e:
         print(f" Fallo con Cerebras: {e}")
