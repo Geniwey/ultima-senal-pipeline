@@ -9,7 +9,6 @@ RUTA_FUENTE_LOCAL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "An
 
 
 def _obtener_fuente(tamano: int) -> ImageFont.FreeTypeFont:
-    """Descarga la fuente cinematográfica Anton si no existe y la carga al tamaño indicado."""
     if not os.path.exists(RUTA_FUENTE_LOCAL) or os.path.getsize(RUTA_FUENTE_LOCAL) < 10_000:
         try:
             req = urllib.request.Request(URL_FUENTE_ANTON, headers={"User-Agent": "Mozilla/5.0"})
@@ -33,27 +32,25 @@ def _obtener_fuente(tamano: int) -> ImageFont.FreeTypeFont:
 
 
 def _realzar_iluminacion_y_degradado(imagen: Image.Image) -> Image.Image:
-    """Sube el brillo y contraste para móviles y aplica un degradado inferior suave para el texto."""
-    # Subir brillo (+28%) y contraste (+15%) para que la imagen nunca quede demasiado oscura en el feed
-    img_iluminada = ImageEnhance.Brightness(imagen).enhance(1.28)
+    """Ilumina la escena y aplica un degradado inferior más corto y suave para no oscurecer en exceso la base."""
+    img_iluminada = ImageEnhance.Brightness(imagen).enhance(1.32)
     img_iluminada = ImageEnhance.Contrast(img_iluminada).enhance(1.15)
     base = img_iluminada.convert("RGBA")
 
     capa_oscura = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
     draw = ImageDraw.Draw(capa_oscura)
 
-    # Degradado inferior suave (del píxel 380 al 720) para que las letras destaquen sin oscurecer el centro
-    inicio_y = 380
+    # Degradado más bajo (del píxel 440 al 720) y menos opaco (175) para que la parte inferior no quede demasiado negra
+    inicio_y = 440
     for y in range(inicio_y, ALTO):
         progreso = (y - inicio_y) / (ALTO - inicio_y)
-        alpha = int(220 * (progreso ** 1.6))
+        alpha = int(175 * (progreso ** 1.7))
         draw.line([(0, y), (ANCHO, y)], fill=(0, 0, 0, alpha))
 
     return Image.alpha_composite(base, capa_oscura)
 
 
 def _crear_gradiente_vertical(ancho: int, alto: int, color_arriba: tuple, color_abajo: tuple) -> Image.Image:
-    """Genera una textura con degradado vertical para rellenar el interior de las letras."""
     gradiente = Image.new("RGBA", (ancho, alto))
     draw = ImageDraw.Draw(gradiente)
     for y in range(alto):
@@ -71,21 +68,18 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
 
     os.makedirs(os.path.dirname(os.path.abspath(ruta_salida)), exist_ok=True)
 
-    # Paso 0: Limpiar cualquier texto alienígena residual (como 'ETTEY' o 'FLACT') en la imagen base
-    _detectar_y_limpiar_texto_ocr(ruta_imagen_base, tapar_si_falla=True)
+    # Limpieza mediante Inpainting (sin oscurecer ni crear parches negros)
+    _detectar_y_limpiar_texto_ocr(ruta_imagen_base, inpaint_si_falla=True)
 
-    # 1. Cargar, encuadrar a 1280x720 y dar más brillo para pantallas móviles
     img_original = Image.open(ruta_imagen_base).convert("RGB")
     lienzo = ImageOps.fit(img_original, (ANCHO, ALTO), method=Image.Resampling.LANCZOS)
     lienzo = _realzar_iluminacion_y_degradado(lienzo)
 
-    # 2. Preparar palabras (evitando el título genérico de ejemplo)
     texto_limpio = titulo_corto[:32].upper().replace("\\", "").replace(":", "").replace("'", "").replace('"', "").strip()
-    if not texto_limpio or "FALLO FATAL" in texto_limpio:
-        texto_limpio = "¿VOLARON CIEGOS?"
+    if not texto_limpio or "PITOT" in texto_limpio or "FALLO FATAL" in texto_limpio:
+        texto_limpio = "LA CINTA MORTAL"
     palabras = texto_limpio.split()
 
-    # 3. Ajustar tamaño de fuente dinámicamente
     tamano_fuente = 152
     margen_maximo = 1140
     dummy_draw = ImageDraw.Draw(lienzo)
@@ -102,9 +96,8 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
     bbox_ref = dummy_draw.textbbox((0, 0), texto_limpio, font=fuente)
     alto_texto = bbox_ref[3] - bbox_ref[1]
     x_inicial = (ANCHO - ancho_total) // 2
-    y_pos = ALTO - alto_texto - 75 - bbox_ref[1]
+    y_pos = ALTO - alto_texto - 70 - bbox_ref[1]
 
-    # 4. Sombra Difuminada Real (Gaussian Blur en 2 capas)
     capa_sombra_amplia = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
     draw_sombra_amplia = ImageDraw.Draw(capa_sombra_amplia)
 
@@ -137,7 +130,6 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
     lienzo = Image.alpha_composite(lienzo, capa_sombra_amplia)
     lienzo = Image.alpha_composite(lienzo, capa_sombra_corta)
 
-    # 5. Trazo exterior fino y máscaras para el degradado interior
     capa_trazo = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
     draw_trazo = ImageDraw.Draw(capa_trazo)
 
@@ -165,18 +157,16 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
 
     lienzo = Image.alpha_composite(lienzo, capa_trazo)
 
-    # 6. Rellenar letras con degradado metálico vertical (Blanco Plata + Amarillo Ámbar)
     y_top = max(0, ALTO - alto_texto - 90)
     alto_grad = min(ALTO - y_top, alto_texto + 60)
 
     grad_blanco = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
-    grad_blanco.paste(_crear_gradiente_vertical(ANCHO, alto_grad, (255, 255, 255), (210, 215, 225)), (0, y_top))
+    grad_blanco.paste(_crear_gradiente_vertical(ANCHO, alto_grad, (255, 255, 255), (215, 220, 230)), (0, y_top))
     lienzo.paste(grad_blanco, (0, 0), mascara_blanca)
 
     grad_acento = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
     grad_acento.paste(_crear_gradiente_vertical(ANCHO, alto_grad, (255, 240, 40), (255, 165, 0)), (0, y_top))
     lienzo.paste(grad_acento, (0, 0), mascara_acento)
 
-    # 7. Guardar en máxima calidad
     lienzo.convert("RGB").save(ruta_salida, quality=95)
     return ruta_salida
