@@ -9,7 +9,7 @@ import re
 
 ESTILO_BASE = (
     "cinematic documentary photography, dramatic moody lighting, 8k resolution, photorealistic, "
-    "unmarked blank aircraft surface, no airline logos, NO TEXT, NO LETTERS, NO NUMBERS, NO SIGNS"
+    "unmarked blank metallic surface, no airline logos, NO TEXT, NO LETTERS, NO NUMBERS, NO SIGNS, NO LABELS"
 )
 
 TIMEOUT = 35
@@ -18,42 +18,20 @@ _cloudflare_agotado = [False]
 _ultima_fue_emergencia = [False]
 
 
-def _adaptar_prompt_segun_contexto(prompt: str) -> str:
-    """Garantiza variedad visual real (océano, rescate, torre, sensores) sin caer siempre en aviones en pista."""
-    p_low = prompt.lower()
-    if any(k in p_low for k in ("ocean", "sea", "water", "impact", "crash", "splash", "mar", "océano")):
-        return (
-            "dark turbulent ocean waves at night in a heavy rainstorm, dramatic lightning reflecting on black water, "
-            "searchlight beam cutting through mist, no airplanes on runway"
-        )
-    if any(k in p_low for k in ("rescue", "helicopter", "search", "flir", "rescate", "búsqueda")):
-        return (
-            "rescue helicopters flying over dark stormy ocean waves at night with bright white searchlights "
-            "illuminating the water surface, cinematic documentary shot"
-        )
-    if any(k in p_low for k in ("black box", "recorder", "fdr", "cvr", "underwater", "seabed", "caja negra")):
-        return (
-            "damaged bright orange flight data recorder box resting on the dark sandy bottom of the ocean underwater, "
-            "dramatic light rays piercing deep blue water, macro shot, no readable text"
-        )
-    if any(k in p_low for k in ("tape", "sensor", "pitot", "static port", "cinta", "duct tape", "blocked")):
-        return (
-            "extreme macro close-up of silver adhesive duct tape stuck over small round static port sensor holes "
-            "on a wet dark metallic airplane fuselage in the rain, dramatic lighting"
-        )
-    if any(k in p_low for k in ("tower", "atc", "controller", "radar", "torre")):
-        return (
-            "tall airport air traffic control tower illuminated at night in dense fog and rain, "
-            "glowing blue and amber lights in the distance, cinematic wide shot"
-        )
-
-    # Limpiar palabras que fuerzan pantallas con letras o caras deformes
+def _enriquecer_prompt_sin_machacar(prompt: str) -> str:
+    """
+    Respeta la variedad de escenas del guion (cabina, torre, cinta, avión, radar, rescate, caja negra)
+    y solo limpia términos que inducen a la IA a escribir texto en inglés.
+    """
     limpio = re.sub(
-        r"\b(dashboard|hud|speedometer|tachometer|book|manual|document|paper|newspaper|letter|logo|sign|label)\b",
-        "metallic fuselage",
+        r"\b(text|words|letters|labels|sign|signs|logo|logos|title|caption|inscription|stencil|writing|numbers)\b",
+        "",
         prompt,
         flags=re.IGNORECASE,
     )
+    # Si el prompt habla de cinta o sensores, reforzamos que el metal sea liso y sin inscripciones como "STATIC SENSOR"
+    if any(k in limpio.lower() for k in ("tape", "static", "port", "sensor", "pitot")):
+        limpio += ", completely blank smooth black metal without any engraved words or markings"
     return limpio.strip()
 
 
@@ -69,9 +47,8 @@ def _validar_imagen(ruta: str) -> bool:
 
 def _detectar_y_limpiar_texto_ocr(ruta: str, inpaint_si_falla: bool = False) -> bool:
     """
-    Detecta texto alienígena con OCR.
-    Si inpaint_si_falla=True, usa OpenCV Telea Inpainting (NUNCA parches negros) para reconstruir
-    la textura del avión o del cielo de forma invisible.
+    Detecta cualquier texto en inglés o números (incluso letras grabadas como 'STATIC SEFNSOR')
+    con umbral sensible (conf > 22) y usa OpenCV Inpainting con máscara dilatada para borrarlo sin rastro.
     """
     try:
         import pytesseract
@@ -81,37 +58,39 @@ def _detectar_y_limpiar_texto_ocr(ruta: str, inpaint_si_falla: bool = False) -> 
 
         img_pil = Image.open(ruta).convert("RGB")
         gris = img_pil.convert("L")
-        gris_contraste = ImageEnhance.Contrast(gris).enhance(2.5)
+        gris_contraste = ImageEnhance.Contrast(gris).enhance(2.8)
         gris_invertido = ImageOps.invert(gris_contraste)
 
         cajas_detectadas = []
         palabras_detectadas = []
 
-        for var in (gris_contraste, gris_invertido):
+        for var in (gris, gris_contraste, gris_invertido):
             datos = pytesseract.image_to_data(var, config="--psm 11", output_type=pytesseract.Output.DICT)
             for i, texto in enumerate(datos["text"]):
                 limpio = re.sub(r"[^A-Za-z0-9]", "", texto.strip())
                 conf = int(datos["conf"][i]) if str(datos["conf"][i]).lstrip("-").isdigit() else 0
-                if len(limpio) >= 3 and conf > 45:
+                if len(limpio) >= 2 and conf > 22:
                     palabras_detectadas.append(limpio)
                     x, y, w, h = datos["left"][i], datos["top"][i], datos["width"][i], datos["height"][i]
                     cajas_detectadas.append((x, y, w, h))
 
         if len(palabras_detectadas) >= 1:
             if inpaint_si_falla and cajas_detectadas:
-                # OpenCV Inpainting: clona la textura circundante sin dejar jamás rectángulos negros
                 img_cv = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
                 mascara = np.zeros(img_cv.shape[:2], dtype=np.uint8)
                 for (x, y, w, h) in cajas_detectadas:
-                    pad = 8
+                    pad = 12
                     x1, y1 = max(0, x - pad), max(0, y - pad)
                     x2, y2 = min(img_cv.shape[1], x + w + pad), min(img_cv.shape[0], y + h + pad)
                     mascara[y1:y2, x1:x2] = 255
-                img_limpia = cv2.inpaint(img_cv, mascara, inpaintRadius=9, flags=cv2.INPAINT_TELEA)
+                # Dilatar la máscara para cubrir bordes de letras curvadas o grabadas en el metal
+                kernel = np.ones((7, 7), np.uint8)
+                mascara = cv2.dilate(mascara, kernel, iterations=2)
+                img_limpia = cv2.inpaint(img_cv, mascara, inpaintRadius=11, flags=cv2.INPAINT_TELEA)
                 Image.fromarray(cv2.cvtColor(img_limpia, cv2.COLOR_BGR2RGB)).save(ruta, quality=95)
-                print(f"  ✨ [Inpaint] Letras integradas en la textura sin parches negros ({palabras_detectadas[:2]}).")
+                print(f"  ✨ [Inpaint] Inscripciones borradas limpiamente ({palabras_detectadas[:3]}).")
                 return False
-            print(f"  ⚠️ [OCR] Texto detectado ({palabras_detectadas[:2]}). Regenerando otra toma...")
+            print(f"  ⚠️ [OCR] Inscripción detectada ({palabras_detectadas[:3]}). Regenerando...")
             return True
     except Exception:
         pass
@@ -160,10 +139,6 @@ def _intentar_pollinations(prompt_completo: str, ruta_salida: str, semilla: int 
 
 
 def _reciclar_imagen_existente(ruta_salida: str) -> bool:
-    """
-    Si las APIs gratuitas dan timeout en las últimas escenas, toma una imagen real ya generada,
-    la voltea horizontalmente y hace un ligero zoom cinematográfico. ¡Cero cuadrículas negras!
-    """
     try:
         from PIL import Image, ImageOps, ImageEnhance
         carpeta = os.path.dirname(os.path.abspath(ruta_salida))
@@ -178,9 +153,8 @@ def _reciclar_imagen_existente(ruta_salida: str) -> bool:
             img = ImageOps.mirror(img)
             w, h = img.size
             img = img.crop((int(w * 0.06), int(h * 0.06), int(w * 0.94), int(h * 0.94))).resize((w, h), Image.Resampling.LANCZOS)
-            img = ImageEnhance.Brightness(img).enhance(0.92)
+            img = ImageEnhance.Brightness(img).enhance(0.94)
             img.save(ruta_salida, quality=95)
-            print("  🔄 [Respaldo Real] Variación en espejo creada a partir de escena previa (evitada cuadrícula negra).")
             return True
     except Exception:
         pass
@@ -204,7 +178,7 @@ def fue_ultima_generacion_emergencia() -> bool:
 
 def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) -> bool:
     os.makedirs(os.path.dirname(os.path.abspath(ruta_salida)), exist_ok=True)
-    sujeto = _adaptar_prompt_segun_contexto(prompt_escena)
+    sujeto = _enriquecer_prompt_sin_machacar(prompt_escena)
     prompt_completo = f"{sujeto}, {ESTILO_BASE}"
     _ultima_fue_emergencia[0] = False
     seed_base = semilla if semilla is not None else abs(hash(prompt_escena)) % 10000
@@ -215,7 +189,7 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) ->
         time.sleep(1.5)
 
     for intento_pol in range(3):
-        if _intentar_pollinations(prompt_completo, ruta_salida, seed_base + intento_pol * 31, ultimo_intento=(intento_pol == 2)):
+        if _intentar_pollinations(prompt_completo, ruta_salida, seed_base + intento_pol * 37, ultimo_intento=(intento_pol == 2)):
             return True
         time.sleep(2.0)
 
