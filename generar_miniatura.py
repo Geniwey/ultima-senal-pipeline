@@ -31,20 +31,34 @@ def _obtener_fuente(tamano: int) -> ImageFont.FreeTypeFont:
     return ImageFont.load_default()
 
 
-def _realzar_iluminacion_y_degradado(imagen: Image.Image) -> Image.Image:
-    """Ilumina la escena y aplica un degradado inferior más corto y suave para no oscurecer en exceso la base."""
-    img_iluminada = ImageEnhance.Brightness(imagen).enhance(1.32)
-    img_iluminada = ImageEnhance.Contrast(img_iluminada).enhance(1.15)
-    base = img_iluminada.convert("RGBA")
+def _encuadrar_y_realzar_protagonista(imagen: Image.Image) -> Image.Image:
+    """
+    Acerca un 12% el centro-superior de la imagen para dar máximo protagonismo al sujeto
+    (el sensor con la cinta y el avión), sube el brillo de las sombras y aplica enfoque cinematográfico.
+    """
+    w, h = imagen.size
+    # Recorte sutil eliminando el exceso de mar oscuro inferior y bordes vacíos
+    left = int(w * 0.05)
+    top = int(h * 0.02)
+    right = int(w * 0.95)
+    bottom = int(h * 0.90)
+    recorte = imagen.crop((left, top, right, bottom))
+    lienzo = ImageOps.fit(recorte, (ANCHO, ALTO), method=Image.Resampling.LANCZOS)
+
+    # Más luz (+35% brillo), contraste (+18%) y nitidez de detalle en el metal/cinta
+    lienzo = ImageEnhance.Brightness(lienzo).enhance(1.35)
+    lienzo = ImageEnhance.Contrast(lienzo).enhance(1.18)
+    lienzo = lienzo.filter(ImageFilter.UnsharpMask(radius=2, percent=135, threshold=3))
+    base = lienzo.convert("RGBA")
 
     capa_oscura = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
     draw = ImageDraw.Draw(capa_oscura)
 
-    # Degradado más bajo (del píxel 440 al 720) y menos opaco (175) para que la parte inferior no quede demasiado negra
-    inicio_y = 440
+    # Degradado inferior muy localizado (solo en los últimos 230px) para no oscurecer la mitad de la imagen
+    inicio_y = 490
     for y in range(inicio_y, ALTO):
         progreso = (y - inicio_y) / (ALTO - inicio_y)
-        alpha = int(175 * (progreso ** 1.7))
+        alpha = int(170 * (progreso ** 1.7))
         draw.line([(0, y), (ANCHO, y)], fill=(0, 0, 0, alpha))
 
     return Image.alpha_composite(base, capa_oscura)
@@ -68,12 +82,11 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
 
     os.makedirs(os.path.dirname(os.path.abspath(ruta_salida)), exist_ok=True)
 
-    # Limpieza mediante Inpainting (sin oscurecer ni crear parches negros)
+    # Limpieza mediante Inpainting de cualquier inscripción diminuta
     _detectar_y_limpiar_texto_ocr(ruta_imagen_base, inpaint_si_falla=True)
 
     img_original = Image.open(ruta_imagen_base).convert("RGB")
-    lienzo = ImageOps.fit(img_original, (ANCHO, ALTO), method=Image.Resampling.LANCZOS)
-    lienzo = _realzar_iluminacion_y_degradado(lienzo)
+    lienzo = _encuadrar_y_realzar_protagonista(img_original)
 
     texto_limpio = titulo_corto[:32].upper().replace("\\", "").replace(":", "").replace("'", "").replace('"', "").strip()
     if not texto_limpio or "PITOT" in texto_limpio or "FALLO FATAL" in texto_limpio:
@@ -96,7 +109,7 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
     bbox_ref = dummy_draw.textbbox((0, 0), texto_limpio, font=fuente)
     alto_texto = bbox_ref[3] - bbox_ref[1]
     x_inicial = (ANCHO - ancho_total) // 2
-    y_pos = ALTO - alto_texto - 70 - bbox_ref[1]
+    y_pos = ALTO - alto_texto - 65 - bbox_ref[1]
 
     capa_sombra_amplia = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
     draw_sombra_amplia = ImageDraw.Draw(capa_sombra_amplia)
@@ -157,7 +170,7 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
 
     lienzo = Image.alpha_composite(lienzo, capa_trazo)
 
-    y_top = max(0, ALTO - alto_texto - 90)
+    y_top = max(0, ALTO - alto_texto - 85)
     alto_grad = min(ALTO - y_top, alto_texto + 60)
 
     grad_blanco = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
