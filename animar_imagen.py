@@ -32,12 +32,11 @@ def animar_imagen(ruta_imagen: str, duracion_segundos: float, ruta_salida: str, 
         texto_seguro = (
             texto_pantalla.upper()
             .replace("\\", "")
-            .replace(":", " -")
+            .replace(":", "\\:")
             .replace("'", "")
             .replace('"', "")
             .replace("%", "")
         )
-        # Caja oscura translúcida (black@0.68) para garantizar legibilidad sobre cualquier fondo claro u oscuro
         filtros.append(
             f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize=68:"
             f"font='DejaVu Sans Bold':borderw=3:bordercolor=black@0.9:"
@@ -57,7 +56,6 @@ def animar_imagen(ruta_imagen: str, duracion_segundos: float, ruta_salida: str, 
     resultado = subprocess.run(comando, capture_output=True, text=True)
 
     if resultado.returncode != 0 or not os.path.exists(ruta_salida) or os.path.getsize(ruta_salida) < 1000:
-        print(f" [Aviso] Reintentando animación simplificada para {os.path.basename(ruta_salida)}...")
         comando_simple = [
             "ffmpeg", "-y", "-loop", "1", "-i", ruta_imagen,
             "-vf", f"scale={ANCHO}:{ALTO}:force_original_aspect_ratio=increase,crop={ANCHO}:{ALTO},setsar=1",
