@@ -15,6 +15,9 @@ def _normalizar_texto_para_tts(texto: str) -> str:
     t = re.sub(r"(\d)[\.,](\d{3})\b", r"\1\2", t)
 
     reemplazos_foneticos = {
+        r"\boverspeed\b": "exceso de velocidad",
+        r"\bstick shaker\b": "vibrador de palanca",
+        r"\bEric Schreiber\b": "Éric Shráiber",
         r"\bLIM\b": "Lima",
         r"\bSCL\b": "Santiago",
         r"\bGPWS\b": "sistema de alerta de proximidad al terreno",
@@ -30,7 +33,7 @@ def _normalizar_texto_para_tts(texto: str) -> str:
         r"\bAD\b": "directiva de aeronavegabilidad",
     }
     for patron, reemplazo in reemplazos_foneticos.items():
-        t = re.sub(patron, reemplazo, t)
+        t = re.sub(patron, reemplazo, t, flags=re.IGNORECASE)
     return t
 
 
@@ -41,7 +44,6 @@ async def _generar_audio_escena(texto: str, ruta_salida: str):
 
 
 def _generar_voz_respaldo_gtts(texto: str, ruta_salida: str) -> bool:
-    """Si Edge-TTS sufre rate-limit, genera la voz con gTTS y la oscurece con FFmpeg para que NUNCA quede una escena muda."""
     try:
         from gtts import gTTS
         texto_limpio = _normalizar_texto_para_tts(texto)
@@ -106,13 +108,11 @@ def generar_voces(ruta_guion: str, carpeta_salida: str) -> list:
                 time.sleep(espera)
 
         if not exito:
-            print("  🔄 Usando motor de voz de respaldo (gTTS) para evitar escena muda...")
             exito = _generar_voz_respaldo_gtts(escena["texto_narracion"], ruta_audio)
 
         if not exito:
             _generar_silencio_por_defecto(ruta_audio, escena["texto_narracion"])
 
-        # Pausa breve de cortesía para que Microsoft no bloquee la IP en mitad del guion
         time.sleep(0.4)
 
         duracion = _duracion_audio(ruta_audio)
