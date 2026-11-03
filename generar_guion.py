@@ -8,50 +8,44 @@ MODELO_PRINCIPAL = "openai/gpt-oss-120b"
 MODELO_FALLBACK = "openai/gpt-oss-20b"
 MODELO_CEREBRAS = "llama-3.3-70b"
 
-SYSTEM_PROMPT = """Eres un director de documentales forenses de aviación para YouTube. Tu objetivo es narrar una historia cronológica impecable, sin repetir jamás escenas ni rótulos, de unos 5 a 6 minutos de duración (entre 36 y 42 escenas en total).
+SYSTEM_PROMPT = """Eres un director de documentales forenses de aviación para YouTube. Narra el caso en 38 escenas con una LÍNEA TEMPORAL ESTRICTAMENTE LINEAL (prohibido resumir todo el accidente al principio y luego volver atrás al hangar).
 
-HECHOS HISTÓRICOS ESTRICTOS (SI EL TEMA ES AEROPERÚ 603):
-- Fecha exacta: 2 de octubre de 1996 (madrugada, despegue 00:40 hora local). Avión: Boeing 757-200. Ruta: Lima a Santiago de Chile.
-- Ocupantes: 70 personas a bordo (61 pasajeros y 9 tripulantes). Fallecieron los 70 (CERO sobrevivientes; NUNCA inventes sobrevivientes ni tornados).
-- Pilotos: Capitán Eric Schreiber y Copiloto David Fernández.
-- Causa real: El empleado de mantenimiento Eleuterio Chacaliaza colocó cinta adhesiva sobre los puertos estáticos para pulir y limpiar el fuselaje, y nadie la retiró antes del vuelo.
-- Secuencia real: Al despegar a las 00:40, los altímetros y velocímetros empezaron a dar lecturas falsas. Se activó la alarma de pérdida (stick shaker) y de exceso de velocidad (overspeed) al mismo tiempo. La torre de Lima les daba una altitud de 9700 pies en el radar porque el transpondedor del avión leía el mismo sensor tapado. A las 01:11 AM, mientras volaban en la oscuridad sobre el mar pensando que estaban a 9700 pies, el ala izquierda rozó el agua y se estrellaron a los 31 minutos de vuelo.
+ESTRUCTURA CRONOLÓGICA ÚNICA (SIN SALTOS ATRÁS):
+- Escenas 1 a 6 (El Error en Tierra): Noche del 1 al 2 de octubre de 1996 en el aeropuerto de Lima. El empleado Eleuterio Chacaliaza tapa los tres puertos estáticos del Boeing 757-200 con cinta adhesiva plateada para pulir el fuselaje. Termina el turno y nadie retira la cinta.
+- Escenas 7 a 12 (El Despegue): 00:40 AM. El Capitán Eric Schreiber y el Copiloto David Fernández despegan con 70 personas rumbo a Santiago. Al cruzar los primeros 1000 pies en la niebla, el velocímetro y el altímetro quedan bloqueados.
+- Escenas 13 a 24 (Ciegos sobre el Pacífico): La torre de Lima ve 9700 pies en su pantalla porque el transpondedor recibe el mismo dato falso del sensor tapado. En cabina saltan alarmas contradictorias: vibración de pérdida (baja velocidad) y alarma de exceso de velocidad al mismo tiempo.
+- Escenas 25 a 30 (El Impacto): 01:11 AM (31 minutos de vuelo). Creyendo estar a 9700 pies, el ala izquierda roza las olas del océano Pacífico. El avión intenta elevarse pero invierte su giro y se estrella en el mar. Fallecen los 70 ocupantes.
+- Escenas 31 a 38 (Hallazgo y Cambio Mundial): Barcos de la Marina iluminan los restos flotantes al amanecer.Un robot submarino recupera el registrador FDR a 150 metros de profundidad. Se descubre la cinta en el trozo de fuselaje y la FAA/OACI obligan a usar cubiertas rojas con banderines ("Remove Before Flight").
 
-PROHIBICIÓN ABSOLUTA DE BUCLES Y REPETICIONES:
-- Avanza SIEMPRE hacia adelante en el tiempo desde la escena 1 hasta la escena 40. El avión solo despega UNA vez y solo impacta UNA vez.
-- Cada "texto_pantalla" (rótulo) DEBE SER 100% ÚNICO en todo el vídeo. PROHIBIDO usar palabras sueltas genéricas como "TORRE", "PILOTOS", "OCÉANO", "TORNADO" o "RESCATE".
-- Cada "texto_pantalla" debe ser un dato informativo o cronológico de 2 a 4 palabras en MAYÚSCULAS: "MANTENIMIENTO EN LIMA", "PUERTOS ESTÁTICOS TAPADOS", "00:40 AM - DESPEGUE", "ALTÍMETRO CONGELADO", "ALARMA CONTRADICTORIA", "FALSO DATO DE RADAR", "DESCENSO EN LA NIEBLA", "IMPACTO EN EL PACÍFICO", "70 VÍCTIMAS MORTALES", "HALLAZGO DEL FDR".
+REGLAS DE RÓTULOS ("texto_pantalla"):
+- 100% en ESPAÑOL correcto (escribe "FUSELAJE", nunca "FUSELAGE"; escribe "EXCESO DE VELOCIDAD", nunca "OVERSPEED").
+- De 2 a 4 palabras informativas y únicas en MAYÚSCULAS.
 
-VARIEDAD VISUAL OBLIGATORIA ("prompt_imagen"):
-- Cada escena debe mostrar exactamente lo que narra la voz en ese segundo, alternando entre estos planos sin texto:
-  1. Cinta en el avión: "Extreme macro close-up of silver adhesive duct tape covering three small round static port sensor holes on a dark wet Boeing 757 fuselage at night, dramatic studio lighting, no text".
-  2. Mantenimiento en hangar: " silhouette of an aircraft mechanic inspecting the lower fuselage of a commercial airliner inside a dark airport hangar at night, moody amber lights, no text".
-  3. Torre de control: "Airport air traffic control tower illuminated in night fog overlooking wet runway lights, cinematic, no text".
-  4. Cabina de pilotos (desde atrás): "Dark over-the-shoulder silhouette of two airline pilots inside a cockpit looking out the windshield into dark night clouds over the ocean, red warning glow, no readable text".
-  5. Avión volando en la noche: "Commercial Boeing 757 airliner flying through dark night clouds above the ocean, unmarked blank fuselage, no logos, no text".
-  6. Trayectoria / Radar abstracto: "Minimalist glowing green radar sweep line on a dark circular glass screen in a dark room, pure geometry, no numbers, no text".
-  7. Impacto / Mar nocturno: "Dark turbulent Pacific ocean waves at night under heavy mist, searchlight beam reflecting on water, no text".
-  8. Búsqueda con barcos y helicópteros: "Naval rescue ship and helicopter with bright searchlights over the ocean at dawn, cinematic documentary shot, no text".
-  9. Caja negra submarina: "Underwater close-up of a damaged orange flight recorder box resting on the dark sandy seabed, rays of light, no text".
+REGLAS DE IMAGEN ("prompt_imagen" - CERO RADARES VERDES Y CERO ESCENAS OSCURAS):
+- PROHIBIDO pedir radares verdes ("green radar").
+- Cada "prompt_imagen" debe coincidir exactamente con el rótulo y pedir SIEMPRE buena iluminación ("well-lit, bright dramatic lighting, clear visibility"):
+  * Si habla de la cinta: "Extreme close-up of smooth flat silver duct tape covering round static port holes on a glossy metallic airplane fuselage, bright studio spotlight, no text, no patterns".
+  * Si habla del hangar: "Well-lit airport maintenance hangar at night with bright overhead floodlights illuminating the nose and landing gear of a commercial Boeing 757, no text".
+  * Si habla de cabina: "Over-the-shoulder view of two pilots in a cockpit illuminated by bright amber and red instrument glow looking out at night clouds, no readable text".
+  * Si habla del avión volando: "Commercial Boeing 757 flying above moonlit clouds at night, bright wing strobes and moonlight reflecting on fuselage, no logos, no text".
+  * Si habla del roce o impacto en el mar: "Commercial airliner wingtip skimming across dark ocean waves at night with white water spray illuminated by landing lights, dramatic, no text".
+  * Si habla de restos o fuselaje dañado: "Floating aircraft debris and metal fuselage fragments on the ocean surface at dawn illuminated by rescue searchlights, cinematic, no text".
+  * Si habla de la caja negra: "Brightly lit underwater shot of an orange flight data recorder box on the sandy seabed illuminated by a bright white submersible spotlight, no text".
 
-REGLAS DE MINIATURA:
-- "titulo_miniatura": "LA CINTA MORTAL" (o 3 palabras de impacto directo sin tecnicismos).
-- "prompt_miniatura": "Dramatic close-up of silver adhesive duct tape stuck over a round metallic sensor port on the side of a dark commercial airplane fuselage, with a stormy night sky and red emergency light reflecting on the wet metal, hyper-realistic, 8k, no text, no letters".
-
-Devuelve ÚNICAMENTE un objeto JSON válido con entre 36 y 42 escenas:
+Devuelve ÚNICAMENTE un JSON válido:
 {
   "titulo_video": "Título intrigante de máximo 60 caracteres",
-  "descripcion_youtube": "Descripción documental de 3 párrafos con datos verificados y cita al Informe Oficial de la CIAA.",
+  "descripcion_youtube": "Descripción de 3 párrafos con datos verificados y cita al Informe Oficial de la CIAA.",
   "tags_youtube": ["aviacion", "documental", "aeroperu 603", "caja negra"],
   "comentario_fijado": "Pregunta de debate sobre el caso",
-  "prompt_miniatura": "Dramatic close-up of silver adhesive duct tape stuck over a round metallic sensor port on the side of a dark commercial airplane fuselage, with a stormy night sky and red emergency light reflecting on the wet metal, hyper-realistic, 8k, no text, no letters",
+  "prompt_miniatura": "Macro close-up of a piece of smooth flat silver adhesive tape partially covering a round chrome static port sensor on a dark blue metallic airplane fuselage, bright lightning bolt in the sky reflecting on the metal, well-lit, hyper-realistic photography, no geometric patterns, no text, no letters",
   "titulo_miniatura": "LA CINTA MORTAL",
   "escenas": [
     {
-      "texto_narracion": "Narración clara y tensa de 18 a 25 palabras con números sin puntos como 9700 pies...",
-      "texto_pantalla": "DATO CONCRETO DE 2-4 PALABRAS",
+      "texto_narracion": "Narración en español de 18 a 25 palabras sin tecnicismos en inglés...",
+      "texto_pantalla": "RÓTULO EN ESPAÑOL",
       "duracion_segundos": 6.0,
-      "prompt_imagen": "Descripción en inglés específica y variada de la escena, unmarked surface, no text"
+      "prompt_imagen": "Well-lit cinematic description matching the exact action of the scene, unmarked surface, no text"
     }
   ]
 }"""
@@ -62,7 +56,7 @@ def _llamar_groq(cliente: Groq, tema: str, modelo: str) -> str:
         model=modelo,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Documenta de forma lineal, sin bucles y en 38 escenas únicas el caso real: {tema}"},
+            {"role": "user", "content": f"Documenta con orden cronológico estricto (1 sola línea temporal) y 38 escenas bien iluminadas el caso: {tema}"},
         ],
         temperature=0.4,
         max_tokens=16000,
@@ -80,7 +74,7 @@ def _llamar_cerebras(tema: str) -> str:
         model=MODELO_CEREBRAS,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Documenta de forma lineal, sin bucles y en 38 escenas únicas el caso real: {tema}"},
+            {"role": "user", "content": f"Documenta con orden cronológico estricto (1 sola línea temporal) y 38 escenas bien iluminadas el caso: {tema}"},
         ],
         temperature=0.4,
         max_tokens=16000,
@@ -89,58 +83,57 @@ def _llamar_cerebras(tema: str) -> str:
 
 
 def _deduplicar_y_blindar_escenas(escenas: list) -> list:
-    """
-    Corta de raíz cualquier intento del LLM de entrar en bucle, repetir rótulos
-    o inventar datos falsos (como sobrevivientes o tornados).
-    """
     escenas_filtradas = []
     rotulos_vistos = set()
     frases_vistas = set()
 
-    reemplazos_rotulos_genericos = {
-        "CINTA ADHESIVA": "PUERTOS ESTÁTICOS TAPADOS",
-        "TORRE": "TORRE DE CONTROL LIMA",
-        "PILOTOS": "INCERTIDUMBRE EN CABINA",
-        "TORNADO": "NOCHE CERRADA EN EL MAR",
-        "OCÉANO": "DESCENSO HACIA EL PACÍFICO",
-        "RESCATE": "OPERATIVO DE BÚSQUEDA",
-        "CAJAS NEGRAS": "ANÁLISIS DE DATOS FDR",
+    correcciones_ortograficas = {
+        "FUSELAGE": "FUSELAJE",
+        "OVERSPEED": "EXCESO VELOCIDAD",
+        "STICK SHAKER": "ALARMA DE PÉRDIDA",
     }
-
-    palabras_corte = ("suscr", "gracias por ver", "like", "campanita", "comenta")
 
     for idx, esc in enumerate(escenas):
         narracion = esc.get("texto_narracion", "").strip()
         rotulo = esc.get("texto_pantalla", "").strip().upper()
+        prompt_img = esc.get("prompt_imagen", "").strip()
 
-        if not narracion or any(p in narracion.lower() or p in rotulo.lower() for p in palabras_corte):
+        if not narracion:
             continue
 
-        # Corregir alucinaciones históricas si el LLM menciona sobrevivientes o tornados
-        narracion = re.sub(r"[Ss]olo dos (pasajeros|sobrevivientes).*?\.", "Lamentablemente, ninguno de los 70 ocupantes a bordo logró sobrevivir al impacto.", narracion)
-        narracion = re.sub(r"[Ll]os dos sobrevivientes.*?\.", "Los equipos de rescate recuperaron los restos del fuselaje en la costa de Chancay.", narracion)
-        narracion = narracion.replace("tornado", "frente de niebla").replace("TORNADO", "NIEBLA")
+        for mal, bien in correcciones_ortograficas.items():
+            rotulo = rotulo.replace(mal, bien)
 
-        if rotulo in reemplazos_rotulos_genericos:
-            rotulo = reemplazos_rotulos_genericos[rotulo]
+        narracion = re.sub(r"\boverspeed\b", "exceso de velocidad", narracion, flags=re.IGNORECASE)
+        narracion = re.sub(r"\bstick shaker\b", "vibrador de palanca", narracion, flags=re.IGNORECASE)
 
-        # Evitar escenas duplicadas o en bucle comparando las primeras palabras
+        # Eliminar radares verdes si el LLM intenta colarlos y asegurar correspondencia visual
+        if "radar" in prompt_img.lower() or "green" in prompt_img.lower():
+            prompt_img = (
+                "Over-the-shoulder view inside an airliner cockpit at night looking at a glowing flight path "
+                "navigation line over the coast of Peru, warm cockpit lighting, no readable text"
+            )
+        if "fuselaje" in rotulo.lower() or "impacto" in rotulo.lower() or "raspa" in rotulo.lower():
+            prompt_img = (
+                "Dramatic shot of commercial airplane wingtip and damaged fuselage skimming dark ocean waves "
+                "with white water spray illuminated by bright searchlights at night, well-lit, no text"
+            )
+
         firma_narracion = " ".join(re.findall(r"[a-záéíóúñ]+", narracion.lower())[:7])
         if firma_narracion in frases_vistas:
             continue
         frases_vistas.add(firma_narracion)
 
-        # Si un rótulo se repite, lo hacemos único según el progreso del documental
         if rotulo in rotulos_vistos:
-            rotulo = f"{rotulo} ({idx + 1})"
+            rotulo = f"{rotulo} II"
         rotulos_vistos.add(rotulo)
 
         esc["texto_narracion"] = narracion
         esc["texto_pantalla"] = rotulo
+        esc["prompt_imagen"] = prompt_img
         escenas_filtradas.append(esc)
 
-    # Limitar a máximo 42 escenas para mantener el vídeo en el rango óptimo de 5 a 6 minutos
-    return escenas_filtradas[:42]
+    return escenas_filtradas[:40]
 
 
 def _limpiar_y_parsear(texto: str) -> dict:
@@ -155,15 +148,13 @@ def _limpiar_y_parsear(texto: str) -> dict:
     if not titulo_min or "PITOT" in titulo_min or "FALLO FATAL" in titulo_min:
         datos["titulo_miniatura"] = "LA CINTA MORTAL"
 
-    # Forzar que la miniatura muestre siempre la cinta adhesiva en el sensor del avión
     datos["prompt_miniatura"] = (
-        "Dramatic close-up of silver adhesive duct tape stuck over a round metallic sensor port on the side of a "
-        "dark commercial Boeing 757 fuselage, with a stormy night sky, lightning bolt and red emergency light "
-        "reflecting on the wet metal, hyper-realistic, 8k, no text, no letters"
+        "Macro close-up of a smooth flat silver adhesive tape strip partially covering a round metallic static port "
+        "sensor on a dark blue Boeing 757 fuselage, bright lightning bolt in the night sky reflecting on the wet metal, "
+        "well-lit studio spotlight, hyper-realistic photography, smooth tape texture, no geometric patterns, no text"
     )
 
     desc = datos.get("descripcion_youtube", "")
-    desc = desc.replace("2 de marzo de 1996", "2 de octubre de 1996")
     if "Fuente" not in desc and "Informe" not in desc:
         desc = (
             desc.strip()
