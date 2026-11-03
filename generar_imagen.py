@@ -8,8 +8,9 @@ import urllib.parse
 import re
 
 ESTILO_BASE = (
-    "cinematic documentary photography, dramatic moody lighting, 8k resolution, photorealistic, "
-    "unmarked blank metallic surface, no airline logos, NO TEXT, NO LETTERS, NO NUMBERS, NO SIGNS, NO LABELS"
+    "cinematic documentary photography, well-lit scene, bright rim lighting, clear visibility, "
+    "8k resolution, photorealistic, unmarked blank metallic surface, smooth texture, "
+    "no airline logos, NO TEXT, NO LETTERS, NO NUMBERS, NO SIGNS"
 )
 
 TIMEOUT = 35
@@ -19,19 +20,14 @@ _ultima_fue_emergencia = [False]
 
 
 def _enriquecer_prompt_sin_machacar(prompt: str) -> str:
-    """
-    Respeta la variedad de escenas del guion (cabina, torre, cinta, avión, radar, rescate, caja negra)
-    y solo limpia términos que inducen a la IA a escribir texto en inglés.
-    """
     limpio = re.sub(
-        r"\b(text|words|letters|labels|sign|signs|logo|logos|title|caption|inscription|stencil|writing|numbers)\b",
+        r"\b(text|words|letters|labels|sign|signs|logo|logos|title|caption|inscription|stencil|writing|numbers|underwater airplane)\b",
         "",
         prompt,
         flags=re.IGNORECASE,
     )
-    # Si el prompt habla de cinta o sensores, reforzamos que el metal sea liso y sin inscripciones como "STATIC SENSOR"
-    if any(k in limpio.lower() for k in ("tape", "static", "port", "sensor", "pitot")):
-        limpio += ", completely blank smooth black metal without any engraved words or markings"
+    if any(k in limpio.lower() for k in ("tape", "static", "port", "sensor")):
+        limpio += ", smooth flat metallic silver duct tape without patterns, completely blank smooth metal"
     return limpio.strip()
 
 
@@ -45,59 +41,60 @@ def _validar_imagen(ruta: str) -> bool:
     return cabecera.startswith(b"\x89PNG") or cabecera.startswith(b"\xff\xd8\xff")
 
 
-def _detectar_y_limpiar_texto_ocr(ruta: str, inpaint_si_falla: bool = False) -> bool:
+def _corregir_exposicion_oscura(ruta: str):
     """
-    Detecta cualquier texto en inglés o números (incluso letras grabadas como 'STATIC SEFNSOR')
-    con umbral sensible (conf > 22) y usa OpenCV Inpainting con máscara dilatada para borrarlo sin rastro.
+    Analiza la luminosidad media de la imagen. Si es muy oscura (como el hangar o planos nocturnos),
+    levanta automáticamente las sombras con corrección Gamma y brillo sin quemar las luces.
+    """
+    try:
+        import numpy as np
+        from PIL import Image, ImageEnhance
+
+        img = Image.open(ruta).convert("RGB")
+        arr = np.array(img, dtype=np.float32)
+        brillo_medio = float(arr.mean())
+
+        if brillo_medio < 62.0:
+            # Corrección Gamma suave (< 1.0 levanta las sombras oscuras)
+            gamma = 0.62 if brillo_medio < 38.0 else 0.74
+            arr_norm = np.clip(arr / 255.0, 0.0, 1.0)
+            arr_gamma = np.power(arr_norm, gamma) * 255.0
+            img_clara = Image.fromarray(np.clip(arr_gamma, 0, 255).astype(np.uint8))
+            img_clara = ImageEnhance.Contrast(img_clara).enhance(1.12)
+            img_clara.save(ruta, quality=95)
+            print(f"  💡 [Auto-Luz] Escena oscura aclarada automáticamente (brillo {brillo_medio:.1f} -> óptimo).")
+    except Exception:
+        pass
+
+
+def _tiene_texto_real_ocr(ruta: str) -> bool:
+    """
+    Solo descarta la imagen si hay palabras reales claras (confianza > 70 y al menos 3 letras seguidas).
+    NO aplica desenfoques ni parches sobre olas, colas de avión ni cintas para mantener nitidez 100%.
     """
     try:
         import pytesseract
-        import cv2
-        import numpy as np
-        from PIL import Image, ImageOps, ImageEnhance
+        from PIL import Image
 
-        img_pil = Image.open(ruta).convert("RGB")
-        gris = img_pil.convert("L")
-        gris_contraste = ImageEnhance.Contrast(gris).enhance(2.8)
-        gris_invertido = ImageOps.invert(gris_contraste)
+        img_pil = Image.open(ruta).convert("L")
+        datos = pytesseract.image_to_data(img_pil, config="--psm 11", output_type=pytesseract.Output.DICT)
+        palabras_claras = []
 
-        cajas_detectadas = []
-        palabras_detectadas = []
+        for i, texto in enumerate(datos["text"]):
+            solo_letras = re.sub(r"[^A-Za-z]", "", texto.strip())
+            conf = int(datos["conf"][i]) if str(datos["conf"][i]).lstrip("-").isdigit() else 0
+            if len(solo_letras) >= 3 and conf > 70:
+                palabras_claras.append(solo_letras)
 
-        for var in (gris, gris_contraste, gris_invertido):
-            datos = pytesseract.image_to_data(var, config="--psm 11", output_type=pytesseract.Output.DICT)
-            for i, texto in enumerate(datos["text"]):
-                limpio = re.sub(r"[^A-Za-z0-9]", "", texto.strip())
-                conf = int(datos["conf"][i]) if str(datos["conf"][i]).lstrip("-").isdigit() else 0
-                if len(limpio) >= 2 and conf > 22:
-                    palabras_detectadas.append(limpio)
-                    x, y, w, h = datos["left"][i], datos["top"][i], datos["width"][i], datos["height"][i]
-                    cajas_detectadas.append((x, y, w, h))
-
-        if len(palabras_detectadas) >= 1:
-            if inpaint_si_falla and cajas_detectadas:
-                img_cv = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
-                mascara = np.zeros(img_cv.shape[:2], dtype=np.uint8)
-                for (x, y, w, h) in cajas_detectadas:
-                    pad = 12
-                    x1, y1 = max(0, x - pad), max(0, y - pad)
-                    x2, y2 = min(img_cv.shape[1], x + w + pad), min(img_cv.shape[0], y + h + pad)
-                    mascara[y1:y2, x1:x2] = 255
-                # Dilatar la máscara para cubrir bordes de letras curvadas o grabadas en el metal
-                kernel = np.ones((7, 7), np.uint8)
-                mascara = cv2.dilate(mascara, kernel, iterations=2)
-                img_limpia = cv2.inpaint(img_cv, mascara, inpaintRadius=11, flags=cv2.INPAINT_TELEA)
-                Image.fromarray(cv2.cvtColor(img_limpia, cv2.COLOR_BGR2RGB)).save(ruta, quality=95)
-                print(f"  ✨ [Inpaint] Inscripciones borradas limpiamente ({palabras_detectadas[:3]}).")
-                return False
-            print(f"  ⚠️ [OCR] Inscripción detectada ({palabras_detectadas[:3]}). Regenerando...")
+        if len(palabras_claras) >= 1:
+            print(f"  ⚠️ [OCR] Letrero claro detectado ({palabras_claras[:2]}). Pidiendo nueva toma limpia...")
             return True
     except Exception:
         pass
     return False
 
 
-def _intentar_cloudflare(prompt_completo: str, ruta_salida: str, ultimo_intento: bool = False) -> bool:
+def _intentar_cloudflare(prompt_completo: str, ruta_salida: str, ignorar_ocr: bool = False) -> bool:
     if _cloudflare_agotado[0]:
         return False
     account_id = os.environ.get("CF_ACCOUNT_ID")
@@ -113,7 +110,10 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str, ultimo_intento:
             if b64_img:
                 with open(ruta_salida, "wb") as f:
                     f.write(base64.b64decode(b64_img))
-                if _validar_imagen(ruta_salida) and not _detectar_y_limpiar_texto_ocr(ruta_salida, inpaint_si_falla=ultimo_intento):
+                if _validar_imagen(ruta_salida):
+                    if not ignorar_ocr and _tiene_texto_real_ocr(ruta_salida):
+                        return False
+                    _corregir_exposicion_oscura(ruta_salida)
                     return True
         if resp.status_code == 429:
             _cloudflare_agotado[0] = True
@@ -122,7 +122,7 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str, ultimo_intento:
     return False
 
 
-def _intentar_pollinations(prompt_completo: str, ruta_salida: str, semilla: int = 42, ultimo_intento: bool = False) -> bool:
+def _intentar_pollinations(prompt_completo: str, ruta_salida: str, semilla: int = 42, ignorar_ocr: bool = False) -> bool:
     try:
         prompt_url = urllib.parse.quote(prompt_completo)
         url = f"https://image.pollinations.ai/prompt/{prompt_url}?width=1280&height=720&seed={semilla}&model=flux&nologo=true"
@@ -131,7 +131,10 @@ def _intentar_pollinations(prompt_completo: str, ruta_salida: str, semilla: int 
         if resp.status_code == 200:
             with open(ruta_salida, "wb") as f:
                 f.write(resp.content)
-            if _validar_imagen(ruta_salida) and not _detectar_y_limpiar_texto_ocr(ruta_salida, inpaint_si_falla=ultimo_intento):
+            if _validar_imagen(ruta_salida):
+                if not ignorar_ocr and _tiene_texto_real_ocr(ruta_salida):
+                    return False
+                _corregir_exposicion_oscura(ruta_salida)
                 return True
     except Exception:
         pass
@@ -140,7 +143,7 @@ def _intentar_pollinations(prompt_completo: str, ruta_salida: str, semilla: int 
 
 def _reciclar_imagen_existente(ruta_salida: str) -> bool:
     try:
-        from PIL import Image, ImageOps, ImageEnhance
+        from PIL import Image, ImageOps
         carpeta = os.path.dirname(os.path.abspath(ruta_salida))
         candidatas = [
             os.path.join(carpeta, f)
@@ -153,7 +156,6 @@ def _reciclar_imagen_existente(ruta_salida: str) -> bool:
             img = ImageOps.mirror(img)
             w, h = img.size
             img = img.crop((int(w * 0.06), int(h * 0.06), int(w * 0.94), int(h * 0.94))).resize((w, h), Image.Resampling.LANCZOS)
-            img = ImageEnhance.Brightness(img).enhance(0.94)
             img.save(ruta_salida, quality=95)
             return True
     except Exception:
@@ -184,12 +186,12 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) ->
     seed_base = semilla if semilla is not None else abs(hash(prompt_escena)) % 10000
 
     for intento_cf in range(2):
-        if _intentar_cloudflare(prompt_completo, ruta_salida, ultimo_intento=(intento_cf == 1)):
+        if _intentar_cloudflare(prompt_completo, ruta_salida, ignorar_ocr=(intento_cf == 1)):
             return True
         time.sleep(1.5)
 
     for intento_pol in range(3):
-        if _intentar_pollinations(prompt_completo, ruta_salida, seed_base + intento_pol * 37, ultimo_intento=(intento_pol == 2)):
+        if _intentar_pollinations(prompt_completo, ruta_salida, seed_base + intento_pol * 41, ignorar_ocr=(intento_pol == 2)):
             return True
         time.sleep(2.0)
 
