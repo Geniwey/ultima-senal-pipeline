@@ -8,29 +8,25 @@ MODELO_PRINCIPAL = "openai/gpt-oss-120b"
 MODELO_FALLBACK = "openai/gpt-oss-20b"
 MODELO_CEREBRAS = "llama-3.3-70b"
 
-SYSTEM_PROMPT = """Eres un director de documentales forenses de aviación para YouTube. Narra el caso en 38 escenas con una LÍNEA TEMPORAL ESTRICTAMENTE LINEAL (prohibido resumir todo el accidente al principio y luego volver atrás al hangar).
+SYSTEM_PROMPT = """Eres un director de documentales forenses de aviación para YouTube. Narra el caso en 38 escenas con una LÍNEA TEMPORAL ESTRICTAMENTE LINEAL de principio a fin.
 
-ESTRUCTURA CRONOLÓGICA ÚNICA (SIN SALTOS ATRÁS):
-- Escenas 1 a 6 (El Error en Tierra): Noche del 1 al 2 de octubre de 1996 en el aeropuerto de Lima. El empleado Eleuterio Chacaliaza tapa los tres puertos estáticos del Boeing 757-200 con cinta adhesiva plateada para pulir el fuselaje. Termina el turno y nadie retira la cinta.
-- Escenas 7 a 12 (El Despegue): 00:40 AM. El Capitán Eric Schreiber y el Copiloto David Fernández despegan con 70 personas rumbo a Santiago. Al cruzar los primeros 1000 pies en la niebla, el velocímetro y el altímetro quedan bloqueados.
-- Escenas 13 a 24 (Ciegos sobre el Pacífico): La torre de Lima ve 9700 pies en su pantalla porque el transpondedor recibe el mismo dato falso del sensor tapado. En cabina saltan alarmas contradictorias: vibración de pérdida (baja velocidad) y alarma de exceso de velocidad al mismo tiempo.
-- Escenas 25 a 30 (El Impacto): 01:11 AM (31 minutos de vuelo). Creyendo estar a 9700 pies, el ala izquierda roza las olas del océano Pacífico. El avión intenta elevarse pero invierte su giro y se estrella en el mar. Fallecen los 70 ocupantes.
-- Escenas 31 a 38 (Hallazgo y Cambio Mundial): Barcos de la Marina iluminan los restos flotantes al amanecer.Un robot submarino recupera el registrador FDR a 150 metros de profundidad. Se descubre la cinta en el trozo de fuselaje y la FAA/OACI obligan a usar cubiertas rojas con banderines ("Remove Before Flight").
+ESTRUCTURA CRONOLÓGICA ÚNICA:
+- Escenas 1 a 6 (El Error en Tierra): Noche del 1 al 2 de octubre de 1996 en Lima. El empleado Eleuterio Chacaliaza tapa los tres puertos estáticos del Boeing 757-200 con cinta adhesiva plateada para pulir el fuselaje. Termina su turno y nadie retira la cinta.
+- Escenas 7 a 12 (El Despegue): 00:40 de la madrugada. El Capitán Eric Schreiber y el Copiloto David Fernández entran a la cabina de mando y despegan con 70 personas rumbo a Santiago. Al cruzar los 1000 pies en la niebla, el velocímetro y el altímetro quedan bloqueados.
+- Escenas 13 a 24 (Ciegos sobre el Pacífico): En la torre de Lima ven 9700 pies porque el transpondedor recibe el mismo dato falso del sensor tapado. En la cabina de mando saltan alarmas contradictorias de baja velocidad y exceso de velocidad.
+- Escenas 25 a 30 (El Impacto): A la una y once de la madrugada (31 minutos de vuelo), creyendo estar a 9700 pies, el ala izquierda roza las olas del océano Pacífico. El avión se invierte y se estrella en el mar. Fallecen los 70 ocupantes.
+- Escenas 31 a 38 (Hallazgo y Cambio Mundial): Barcos de la Marina iluminan fragmentos flotantes al amanecer. Un robot submarino recupera la caja negra a 150 metros de profundidad. Se descubre la cinta en el fuselaje y la OACI obliga a usar cubiertas protectoras con banderines rojos de retirar antes del vuelo.
 
-REGLAS DE RÓTULOS ("texto_pantalla"):
-- 100% en ESPAÑOL correcto (escribe "FUSELAJE", nunca "FUSELAGE"; escribe "EXCESO DE VELOCIDAD", nunca "OVERSPEED").
-- De 2 a 4 palabras informativas y únicas en MAYÚSCULAS.
+REGLAS ESTRICTAS DE RÓTULOS ("texto_pantalla"):
+- PROHIBIDO CORTAR O ABREVIAR PALABRAS (NUNCA escribas "VELOCÍMETRO BLO", "LISTA DE VERIF", "INDICADORES CONTRA", "VIBRACIÓN CRÍT", "SOLICITUD CONTRO", "TURBULENCIA INVIS", "CAJA NEGRA RECUP" ni "ENTRENAMIENTO PILOT"). Escribe SIEMPRE las palabras enteras.
+- NUNCA traduzcas "cockpit" como "cocina"; escribe siempre "CABINA DE MANDO".
+- Cuida la concordancia en español ("NIEBLA DENSA", nunca "NIEBLA DENSO").
+- Usa de 2 a 3 palabras completas en MAYÚSCULAS (máximo 24 caracteres en total).
 
-REGLAS DE IMAGEN ("prompt_imagen" - CERO RADARES VERDES Y CERO ESCENAS OSCURAS):
-- PROHIBIDO pedir radares verdes ("green radar").
-- Cada "prompt_imagen" debe coincidir exactamente con el rótulo y pedir SIEMPRE buena iluminación ("well-lit, bright dramatic lighting, clear visibility"):
-  * Si habla de la cinta: "Extreme close-up of smooth flat silver duct tape covering round static port holes on a glossy metallic airplane fuselage, bright studio spotlight, no text, no patterns".
-  * Si habla del hangar: "Well-lit airport maintenance hangar at night with bright overhead floodlights illuminating the nose and landing gear of a commercial Boeing 757, no text".
-  * Si habla de cabina: "Over-the-shoulder view of two pilots in a cockpit illuminated by bright amber and red instrument glow looking out at night clouds, no readable text".
-  * Si habla del avión volando: "Commercial Boeing 757 flying above moonlit clouds at night, bright wing strobes and moonlight reflecting on fuselage, no logos, no text".
-  * Si habla del roce o impacto en el mar: "Commercial airliner wingtip skimming across dark ocean waves at night with white water spray illuminated by landing lights, dramatic, no text".
-  * Si habla de restos o fuselaje dañado: "Floating aircraft debris and metal fuselage fragments on the ocean surface at dawn illuminated by rescue searchlights, cinematic, no text".
-  * Si habla de la caja negra: "Brightly lit underwater shot of an orange flight data recorder box on the sandy seabed illuminated by a bright white submersible spotlight, no text".
+REGLAS DE VARIEDAD VISUAL ("prompt_imagen" - PROHIBIDO REPETIR PLANOS O PONER TÚNELES):
+- NO repitas el plano de los dos pilotos de espaldas más de 2 veces en todo el vídeo.
+- PROHIBIDO pedir túneles, pasillos subterráneos o interiores de edificios en las escenas finales.
+- Alterna constantemente entre planos exteriores del avión en las nubes, motores, alas sobre el mar, torre de control en la niebla, barco de rescate, robot submarino, caja negra y primer plano de los banderines rojos "Remove Before Flight" en el fuselaje de un avión en pista al amanecer.
 
 Devuelve ÚNICAMENTE un JSON válido:
 {
@@ -38,12 +34,12 @@ Devuelve ÚNICAMENTE un JSON válido:
   "descripcion_youtube": "Descripción de 3 párrafos con datos verificados y cita al Informe Oficial de la CIAA.",
   "tags_youtube": ["aviacion", "documental", "aeroperu 603", "caja negra"],
   "comentario_fijado": "Pregunta de debate sobre el caso",
-  "prompt_miniatura": "Macro close-up of a piece of smooth flat silver adhesive tape partially covering a round chrome static port sensor on a dark blue metallic airplane fuselage, bright lightning bolt in the sky reflecting on the metal, well-lit, hyper-realistic photography, no geometric patterns, no text, no letters",
+  "prompt_miniatura": "Extreme macro close-up of a piece of glossy silver-grey industrial duct tape with sticky adhesive edges partially covering a round metallic static port sensor on a dark navy blue airplane fuselage, lightning bolt in the night sky, realistic studio lighting, no text, no letters",
   "titulo_miniatura": "LA CINTA MORTAL",
   "escenas": [
     {
-      "texto_narracion": "Narración en español de 18 a 25 palabras sin tecnicismos en inglés...",
-      "texto_pantalla": "RÓTULO EN ESPAÑOL",
+      "texto_narracion": "Narración 100% en español (sin palabras en inglés como cockpit o Remove Before Flight) y números juntos como 9700 pies...",
+      "texto_pantalla": "2-3 PALABRAS COMPLETAS",
       "duracion_segundos": 6.0,
       "prompt_imagen": "Well-lit cinematic description matching the exact action of the scene, unmarked surface, no text"
     }
@@ -51,12 +47,42 @@ Devuelve ÚNICAMENTE un JSON válido:
 }"""
 
 
+# Diccionario que repara automáticamente cualquier palabra truncada o mal traducida por el LLM
+REPARACION_ROTULOS = {
+    r"\bCOCINA\b": "CABINA",
+    r"\bNIEBLA DENSO\b": "NIEBLA DENSA",
+    r"\bVERIF\b": "VERIFICACIÓN",
+    r"\bBLO\b": "BLOQUEADO",
+    r"\bCONTRA\b": "OPUESTOS",
+    r"\bCRÍT\b": "CRÍTICA",
+    r"\bCONTRO\b": "CONTROL",
+    r"\bINVIS\b": "INVISIBLE",
+    r"\bRECUP\b": "HALLADA",
+    r"\bPILOT\b": "PILOTOS",
+    r"\bESTÁT\b": "ESTÁTICOS",
+    r"\bMANTENIM\b": "MANTENIMIENTO",
+    r"\b VELOC\b": " VELOCIDAD",
+    r"\bINSTRUM\b": "INSTRUMENTOS",
+    r"\bFUSELAGE\b": "FUSELAJE",
+}
+
+# Rotación de planos cinematográficos variados para evitar que se repita la cabina o salgan túneles
+PLANOS_VARIADOS_VUELO = [
+    "Exterior side view of a commercial Boeing 757 flying through dark night clouds with moonbeams reflecting on the blank metallic fuselage, well-lit, no text",
+    "Close-up of a commercial airliner jet engine turbine spinning in heavy night mist with warm runway lights reflecting on wet metal, no text",
+    "View from the wingtip of a commercial airliner banking left above dark ocean clouds at night, glowing red navigation light, no text",
+    "Airport air traffic control tower illuminated by amber floodlights in night fog overlooking a wet tarmac, cinematic, no text",
+    "Low angle shot of a commercial airliner flying low over dark ocean waves at night with landing lights piercing the fog, no text",
+    "Close-up of aircraft nose cone and windshield wipers in heavy night rain, dramatic studio lighting, no text",
+]
+
+
 def _llamar_groq(cliente: Groq, tema: str, modelo: str) -> str:
     respuesta = cliente.chat.completions.create(
         model=modelo,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Documenta con orden cronológico estricto (1 sola línea temporal) y 38 escenas bien iluminadas el caso: {tema}"},
+            {"role": "user", "content": f"Documenta con palabras completas sin truncar y máxima variedad visual el caso: {tema}"},
         ],
         temperature=0.4,
         max_tokens=16000,
@@ -74,7 +100,7 @@ def _llamar_cerebras(tema: str) -> str:
         model=MODELO_CEREBRAS,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Documenta con orden cronológico estricto (1 sola línea temporal) y 38 escenas bien iluminadas el caso: {tema}"},
+            {"role": "user", "content": f"Documenta con palabras completas sin truncar y máxima variedad visual el caso: {tema}"},
         ],
         temperature=0.4,
         max_tokens=16000,
@@ -82,41 +108,54 @@ def _llamar_cerebras(tema: str) -> str:
     return respuesta.choices[0].message.content
 
 
+def _reparar_rotulo(rotulo: str) -> str:
+    r = rotulo.strip().upper()
+    for patron, reemplazo in REPARACION_ROTULOS.items():
+        r = re.sub(patron, reemplazo, r)
+    return r
+
+
 def _deduplicar_y_blindar_escenas(escenas: list) -> list:
     escenas_filtradas = []
     rotulos_vistos = set()
     frases_vistas = set()
-
-    correcciones_ortograficas = {
-        "FUSELAGE": "FUSELAJE",
-        "OVERSPEED": "EXCESO VELOCIDAD",
-        "STICK SHAKER": "ALARMA DE PÉRDIDA",
-    }
+    contador_cabina = 0
 
     for idx, esc in enumerate(escenas):
         narracion = esc.get("texto_narracion", "").strip()
-        rotulo = esc.get("texto_pantalla", "").strip().upper()
+        rotulo = _reparar_rotulo(esc.get("texto_pantalla", ""))
         prompt_img = esc.get("prompt_imagen", "").strip()
 
         if not narracion:
             continue
 
-        for mal, bien in correcciones_ortograficas.items():
-            rotulo = rotulo.replace(mal, bien)
+        # Limpiar anglicismos y números partidos con espacio en la narración
+        narracion = re.sub(r"(\d)\s+(\d{3})\b", r"\1\2", narracion)
+        narracion = re.sub(r"\bcockpit\b", "cabina de mando", narracion, flags=re.IGNORECASE)
+        narracion = re.sub(r"\bRemove Before Flight\b", "retirar antes del vuelo", narracion, flags=re.IGNORECASE)
+        narracion = re.sub(r"[Aa] los (1:11|una once)", "A la una y once de la madrugada", narracion)
 
-        narracion = re.sub(r"\boverspeed\b", "exceso de velocidad", narracion, flags=re.IGNORECASE)
-        narracion = re.sub(r"\bstick shaker\b", "vibrador de palanca", narracion, flags=re.IGNORECASE)
+        # Limitar planos de cabina ("cockpit" / "pilots") a máximo 2 en todo el vídeo para no cansar
+        es_plano_cabina = any(k in prompt_img.lower() for k in ("cockpit", "pilot", "shoulder", "windshield"))
+        if es_plano_cabina:
+            contador_cabina += 1
+            if contador_cabina > 2:
+                prompt_img = PLANOS_VARIADOS_VUELO[idx % len(PLANOS_VARIADOS_VUELO)]
 
-        # Eliminar radares verdes si el LLM intenta colarlos y asegurar correspondencia visual
-        if "radar" in prompt_img.lower() or "green" in prompt_img.lower():
+        # Reemplazar túneles, pasillos o imágenes abstractas en las escenas de normas/investigación
+        if any(k in prompt_img.lower() for k in ("tunnel", "corridor", "hallway", "subway", "radar", "abstract", "blur")):
+            prompt_img = PLANOS_VARIADOS_VUELO[idx % len(PLANOS_VARIADOS_VUELO)]
+
+        if any(k in rotulo.lower() for k in ("norma", "bander", "regla", "inspecc", "lecci", "entrenam")):
             prompt_img = (
-                "Over-the-shoulder view inside an airliner cockpit at night looking at a glowing flight path "
-                "navigation line over the coast of Peru, warm cockpit lighting, no readable text"
+                "Close-up of a bright red safety streamer ribbon hanging from a metallic sensor cover on the side "
+                "of a commercial airliner parked on a sunlit airport apron at dawn, cinematic, no text, no letters"
             )
-        if "fuselaje" in rotulo.lower() or "impacto" in rotulo.lower() or "raspa" in rotulo.lower():
+
+        if any(k in rotulo.lower() for k in ("resto", "silencio", "marina", "impacto", "pacífico")):
             prompt_img = (
-                "Dramatic shot of commercial airplane wingtip and damaged fuselage skimming dark ocean waves "
-                "with white water spray illuminated by bright searchlights at night, well-lit, no text"
+                "Small floating metal aircraft debris fragments on dark ocean waves at dawn illuminated by "
+                "a naval rescue ship searchlight in the distance, no whole airplanes, no text"
             )
 
         firma_narracion = " ".join(re.findall(r"[a-záéíóúñ]+", narracion.lower())[:7])
@@ -149,9 +188,9 @@ def _limpiar_y_parsear(texto: str) -> dict:
         datos["titulo_miniatura"] = "LA CINTA MORTAL"
 
     datos["prompt_miniatura"] = (
-        "Macro close-up of a smooth flat silver adhesive tape strip partially covering a round metallic static port "
-        "sensor on a dark blue Boeing 757 fuselage, bright lightning bolt in the night sky reflecting on the wet metal, "
-        "well-lit studio spotlight, hyper-realistic photography, smooth tape texture, no geometric patterns, no text"
+        "Extreme macro close-up of a strip of glossy silver-grey metallic duct tape with sticky adhesive edges "
+        "partially covering a round chrome static port sensor on a dark slate-blue Boeing 757 fuselage, "
+        "lightning bolt in the night sky reflecting on wet metal, hyper-realistic photography, no fabric texture, no text"
     )
 
     desc = datos.get("descripcion_youtube", "")
