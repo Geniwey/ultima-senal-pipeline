@@ -29,16 +29,18 @@ def animar_imagen(ruta_imagen: str, duracion_segundos: float, ruta_salida: str, 
     filtros = [filtro_zoompan, "vignette=angle=PI/4"]
 
     if texto_pantalla:
+        # CERO recorte de caracteres: se muestra el rótulo completo y se adapta el fontsize si es largo
         texto_seguro = (
-            texto_pantalla.upper()
+            texto_pantalla.strip().upper()
             .replace("\\", "")
             .replace(":", "\\:")
             .replace("'", "")
             .replace('"', "")
             .replace("%", "")
         )
+        tamano_letra = 64 if len(texto_seguro) <= 22 else max(46, int(1400 / len(texto_seguro)))
         filtros.append(
-            f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize=68:"
+            f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize={tamano_letra}:"
             f"font='DejaVu Sans Bold':borderw=3:bordercolor=black@0.9:"
             f"box=1:boxcolor=black@0.68:boxborderw=18:"
             f"x=(w-text_w)/2:y=h-text_h-110:"
