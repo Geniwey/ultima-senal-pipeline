@@ -8,8 +8,9 @@ import urllib.parse
 import re
 
 ESTILO_BASE = (
-    "cinematic documentary photography, dramatic moody lighting, 8k resolution, photorealistic, "
-    "unmarked blank aircraft surface, no airline logos, NO TEXT, NO LETTERS, NO NUMBERS, NO SIGNS"
+    "cinematic documentary photography, well-lit scene, bright rim lighting, clear visibility, "
+    "8k resolution, photorealistic, unmarked blank metallic surface, smooth texture, "
+    "no airline logos, NO TEXT, NO LETTERS, NO NUMBERS, NO SIGNS"
 )
 
 TIMEOUT = 35
@@ -18,42 +19,15 @@ _cloudflare_agotado = [False]
 _ultima_fue_emergencia = [False]
 
 
-def _adaptar_prompt_segun_contexto(prompt: str) -> str:
-    """Garantiza variedad visual real (océano, rescate, torre, sensores) sin caer siempre en aviones en pista."""
-    p_low = prompt.lower()
-    if any(k in p_low for k in ("ocean", "sea", "water", "impact", "crash", "splash", "mar", "océano")):
-        return (
-            "dark turbulent ocean waves at night in a heavy rainstorm, dramatic lightning reflecting on black water, "
-            "searchlight beam cutting through mist, no airplanes on runway"
-        )
-    if any(k in p_low for k in ("rescue", "helicopter", "search", "flir", "rescate", "búsqueda")):
-        return (
-            "rescue helicopters flying over dark stormy ocean waves at night with bright white searchlights "
-            "illuminating the water surface, cinematic documentary shot"
-        )
-    if any(k in p_low for k in ("black box", "recorder", "fdr", "cvr", "underwater", "seabed", "caja negra")):
-        return (
-            "damaged bright orange flight data recorder box resting on the dark sandy bottom of the ocean underwater, "
-            "dramatic light rays piercing deep blue water, macro shot, no readable text"
-        )
-    if any(k in p_low for k in ("tape", "sensor", "pitot", "static port", "cinta", "duct tape", "blocked")):
-        return (
-            "extreme macro close-up of silver adhesive duct tape stuck over small round static port sensor holes "
-            "on a wet dark metallic airplane fuselage in the rain, dramatic lighting"
-        )
-    if any(k in p_low for k in ("tower", "atc", "controller", "radar", "torre")):
-        return (
-            "tall airport air traffic control tower illuminated at night in dense fog and rain, "
-            "glowing blue and amber lights in the distance, cinematic wide shot"
-        )
-
-    # Limpiar palabras que fuerzan pantallas con letras o caras deformes
+def _enriquecer_prompt_sin_machacar(prompt: str) -> str:
     limpio = re.sub(
-        r"\b(dashboard|hud|speedometer|tachometer|book|manual|document|paper|newspaper|letter|logo|sign|label)\b",
-        "metallic fuselage",
+        r"\b(text|words|letters|labels|sign|signs|logo|logos|title|caption|inscription|stencil|writing|numbers|tunnel|subway)\b",
+        "",
         prompt,
         flags=re.IGNORECASE,
     )
+    if any(k in limpio.lower() for k in ("tape", "static", "port", "sensor")):
+        limpio += ", glossy metallic silver-grey adhesive duct tape with sticky edges, completely blank smooth metal"
     return limpio.strip()
 
 
@@ -67,58 +41,55 @@ def _validar_imagen(ruta: str) -> bool:
     return cabecera.startswith(b"\x89PNG") or cabecera.startswith(b"\xff\xd8\xff")
 
 
-def _detectar_y_limpiar_texto_ocr(ruta: str, inpaint_si_falla: bool = False) -> bool:
+def _corregir_exposicion_oscura(ruta: str):
+    try:
+        import numpy as np
+        from PIL import Image, ImageEnhance
+
+        img = Image.open(ruta).convert("RGB")
+        arr = np.array(img, dtype=np.float32)
+        brillo_medio = float(arr.mean())
+
+        if brillo_medio < 62.0:
+            gamma = 0.62 if brillo_medio < 38.0 else 0.74
+            arr_norm = np.clip(arr / 255.0, 0.0, 1.0)
+            arr_gamma = np.power(arr_norm, gamma) * 255.0
+            img_clara = Image.fromarray(np.clip(arr_gamma, 0, 255).astype(np.uint8))
+            img_clara = ImageEnhance.Contrast(img_clara).enhance(1.12)
+            img_clara.save(ruta, quality=95)
+    except Exception:
+        pass
+
+
+def _tiene_texto_real_ocr(ruta: str) -> bool:
     """
-    Detecta texto alienígena con OCR.
-    Si inpaint_si_falla=True, usa OpenCV Telea Inpainting (NUNCA parches negros) para reconstruir
-    la textura del avión o del cielo de forma invisible.
+    Detecta letreros en paredes o fuselajes (conf > 52 y >= 3 caracteres alfanuméricos)
+    y descarta la imagen para pedir una limpia, sin emborronar jamás la foto.
     """
     try:
         import pytesseract
-        import cv2
-        import numpy as np
-        from PIL import Image, ImageOps, ImageEnhance
+        from PIL import Image, ImageEnhance
 
-        img_pil = Image.open(ruta).convert("RGB")
-        gris = img_pil.convert("L")
-        gris_contraste = ImageEnhance.Contrast(gris).enhance(2.5)
-        gris_invertido = ImageOps.invert(gris_contraste)
+        img_pil = Image.open(ruta).convert("L")
+        img_contraste = ImageEnhance.Contrast(img_pil).enhance(2.0)
+        datos = pytesseract.image_to_data(img_contraste, config="--psm 11", output_type=pytesseract.Output.DICT)
+        palabras_claras = []
 
-        cajas_detectadas = []
-        palabras_detectadas = []
+        for i, texto in enumerate(datos["text"]):
+            solo_alfanum = re.sub(r"[^A-Za-z0-9]", "", texto.strip())
+            conf = int(datos["conf"][i]) if str(datos["conf"][i]).lstrip("-").isdigit() else 0
+            if len(solo_alfanum) >= 3 and conf > 52:
+                palabras_claras.append(solo_alfanum)
 
-        for var in (gris_contraste, gris_invertido):
-            datos = pytesseract.image_to_data(var, config="--psm 11", output_type=pytesseract.Output.DICT)
-            for i, texto in enumerate(datos["text"]):
-                limpio = re.sub(r"[^A-Za-z0-9]", "", texto.strip())
-                conf = int(datos["conf"][i]) if str(datos["conf"][i]).lstrip("-").isdigit() else 0
-                if len(limpio) >= 3 and conf > 45:
-                    palabras_detectadas.append(limpio)
-                    x, y, w, h = datos["left"][i], datos["top"][i], datos["width"][i], datos["height"][i]
-                    cajas_detectadas.append((x, y, w, h))
-
-        if len(palabras_detectadas) >= 1:
-            if inpaint_si_falla and cajas_detectadas:
-                # OpenCV Inpainting: clona la textura circundante sin dejar jamás rectángulos negros
-                img_cv = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
-                mascara = np.zeros(img_cv.shape[:2], dtype=np.uint8)
-                for (x, y, w, h) in cajas_detectadas:
-                    pad = 8
-                    x1, y1 = max(0, x - pad), max(0, y - pad)
-                    x2, y2 = min(img_cv.shape[1], x + w + pad), min(img_cv.shape[0], y + h + pad)
-                    mascara[y1:y2, x1:x2] = 255
-                img_limpia = cv2.inpaint(img_cv, mascara, inpaintRadius=9, flags=cv2.INPAINT_TELEA)
-                Image.fromarray(cv2.cvtColor(img_limpia, cv2.COLOR_BGR2RGB)).save(ruta, quality=95)
-                print(f"  ✨ [Inpaint] Letras integradas en la textura sin parches negros ({palabras_detectadas[:2]}).")
-                return False
-            print(f"  ⚠️ [OCR] Texto detectado ({palabras_detectadas[:2]}). Regenerando otra toma...")
+        if len(palabras_claras) >= 1:
+            print(f"  ⚠️ [OCR] Letrero detectado ({palabras_claras[:2]}). Regenerando toma limpia...")
             return True
     except Exception:
         pass
     return False
 
 
-def _intentar_cloudflare(prompt_completo: str, ruta_salida: str, ultimo_intento: bool = False) -> bool:
+def _intentar_cloudflare(prompt_completo: str, ruta_salida: str, ignorar_ocr: bool = False) -> bool:
     if _cloudflare_agotado[0]:
         return False
     account_id = os.environ.get("CF_ACCOUNT_ID")
@@ -134,7 +105,10 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str, ultimo_intento:
             if b64_img:
                 with open(ruta_salida, "wb") as f:
                     f.write(base64.b64decode(b64_img))
-                if _validar_imagen(ruta_salida) and not _detectar_y_limpiar_texto_ocr(ruta_salida, inpaint_si_falla=ultimo_intento):
+                if _validar_imagen(ruta_salida):
+                    if not ignorar_ocr and _tiene_texto_real_ocr(ruta_salida):
+                        return False
+                    _corregir_exposicion_oscura(ruta_salida)
                     return True
         if resp.status_code == 429:
             _cloudflare_agotado[0] = True
@@ -143,7 +117,7 @@ def _intentar_cloudflare(prompt_completo: str, ruta_salida: str, ultimo_intento:
     return False
 
 
-def _intentar_pollinations(prompt_completo: str, ruta_salida: str, semilla: int = 42, ultimo_intento: bool = False) -> bool:
+def _intentar_pollinations(prompt_completo: str, ruta_salida: str, semilla: int = 42, ignorar_ocr: bool = False) -> bool:
     try:
         prompt_url = urllib.parse.quote(prompt_completo)
         url = f"https://image.pollinations.ai/prompt/{prompt_url}?width=1280&height=720&seed={semilla}&model=flux&nologo=true"
@@ -152,7 +126,10 @@ def _intentar_pollinations(prompt_completo: str, ruta_salida: str, semilla: int 
         if resp.status_code == 200:
             with open(ruta_salida, "wb") as f:
                 f.write(resp.content)
-            if _validar_imagen(ruta_salida) and not _detectar_y_limpiar_texto_ocr(ruta_salida, inpaint_si_falla=ultimo_intento):
+            if _validar_imagen(ruta_salida):
+                if not ignorar_ocr and _tiene_texto_real_ocr(ruta_salida):
+                    return False
+                _corregir_exposicion_oscura(ruta_salida)
                 return True
     except Exception:
         pass
@@ -160,12 +137,8 @@ def _intentar_pollinations(prompt_completo: str, ruta_salida: str, semilla: int 
 
 
 def _reciclar_imagen_existente(ruta_salida: str) -> bool:
-    """
-    Si las APIs gratuitas dan timeout en las últimas escenas, toma una imagen real ya generada,
-    la voltea horizontalmente y hace un ligero zoom cinematográfico. ¡Cero cuadrículas negras!
-    """
     try:
-        from PIL import Image, ImageOps, ImageEnhance
+        from PIL import Image, ImageOps
         carpeta = os.path.dirname(os.path.abspath(ruta_salida))
         candidatas = [
             os.path.join(carpeta, f)
@@ -178,9 +151,7 @@ def _reciclar_imagen_existente(ruta_salida: str) -> bool:
             img = ImageOps.mirror(img)
             w, h = img.size
             img = img.crop((int(w * 0.06), int(h * 0.06), int(w * 0.94), int(h * 0.94))).resize((w, h), Image.Resampling.LANCZOS)
-            img = ImageEnhance.Brightness(img).enhance(0.92)
             img.save(ruta_salida, quality=95)
-            print("  🔄 [Respaldo Real] Variación en espejo creada a partir de escena previa (evitada cuadrícula negra).")
             return True
     except Exception:
         pass
@@ -204,18 +175,18 @@ def fue_ultima_generacion_emergencia() -> bool:
 
 def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) -> bool:
     os.makedirs(os.path.dirname(os.path.abspath(ruta_salida)), exist_ok=True)
-    sujeto = _adaptar_prompt_segun_contexto(prompt_escena)
+    sujeto = _enriquecer_prompt_sin_machacar(prompt_escena)
     prompt_completo = f"{sujeto}, {ESTILO_BASE}"
     _ultima_fue_emergencia[0] = False
     seed_base = semilla if semilla is not None else abs(hash(prompt_escena)) % 10000
 
     for intento_cf in range(2):
-        if _intentar_cloudflare(prompt_completo, ruta_salida, ultimo_intento=(intento_cf == 1)):
+        if _intentar_cloudflare(prompt_completo, ruta_salida, ignorar_ocr=(intento_cf == 1)):
             return True
         time.sleep(1.5)
 
     for intento_pol in range(3):
-        if _intentar_pollinations(prompt_completo, ruta_salida, seed_base + intento_pol * 31, ultimo_intento=(intento_pol == 2)):
+        if _intentar_pollinations(prompt_completo, ruta_salida, seed_base + intento_pol * 43, ignorar_ocr=(intento_pol == 2)):
             return True
         time.sleep(2.0)
 
