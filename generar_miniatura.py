@@ -1,7 +1,6 @@
 import os
 import urllib.request
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps, ImageEnhance
-from generar_imagen import _detectar_y_limpiar_texto_ocr
 
 ANCHO, ALTO = 1280, 720
 URL_FUENTE_ANTON = "https://raw.githubusercontent.com/google/fonts/main/ofl/anton/Anton-Regular.ttf"
@@ -31,20 +30,22 @@ def _obtener_fuente(tamano: int) -> ImageFont.FreeTypeFont:
     return ImageFont.load_default()
 
 
-def _realzar_iluminacion_y_degradado(imagen: Image.Image) -> Image.Image:
-    """Ilumina la escena y aplica un degradado inferior más corto y suave para no oscurecer en exceso la base."""
-    img_iluminada = ImageEnhance.Brightness(imagen).enhance(1.32)
-    img_iluminada = ImageEnhance.Contrast(img_iluminada).enhance(1.15)
-    base = img_iluminada.convert("RGBA")
+def _encuadrar_y_realzar_protagonista(imagen: Image.Image) -> Image.Image:
+    lienzo = ImageOps.fit(imagen, (ANCHO, ALTO), method=Image.Resampling.LANCZOS)
+    # Moderar saturación (-12%) para evitar azules demasiado eléctricos y dar aspecto metálico real
+    lienzo = ImageEnhance.Color(lienzo).enhance(0.88)
+    lienzo = ImageEnhance.Brightness(lienzo).enhance(1.18)
+    lienzo = ImageEnhance.Contrast(lienzo).enhance(1.14)
+    lienzo = lienzo.filter(ImageFilter.UnsharpMask(radius=1.8, percent=125, threshold=3))
+    base = lienzo.convert("RGBA")
 
     capa_oscura = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
     draw = ImageDraw.Draw(capa_oscura)
 
-    # Degradado más bajo (del píxel 440 al 720) y menos opaco (175) para que la parte inferior no quede demasiado negra
-    inicio_y = 440
+    inicio_y = 530
     for y in range(inicio_y, ALTO):
         progreso = (y - inicio_y) / (ALTO - inicio_y)
-        alpha = int(175 * (progreso ** 1.7))
+        alpha = int(185 * (progreso ** 1.6))
         draw.line([(0, y), (ANCHO, y)], fill=(0, 0, 0, alpha))
 
     return Image.alpha_composite(base, capa_oscura)
@@ -68,25 +69,21 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
 
     os.makedirs(os.path.dirname(os.path.abspath(ruta_salida)), exist_ok=True)
 
-    # Limpieza mediante Inpainting (sin oscurecer ni crear parches negros)
-    _detectar_y_limpiar_texto_ocr(ruta_imagen_base, inpaint_si_falla=True)
-
     img_original = Image.open(ruta_imagen_base).convert("RGB")
-    lienzo = ImageOps.fit(img_original, (ANCHO, ALTO), method=Image.Resampling.LANCZOS)
-    lienzo = _realzar_iluminacion_y_degradado(lienzo)
+    lienzo = _encuadrar_y_realzar_protagonista(img_original)
 
     texto_limpio = titulo_corto[:32].upper().replace("\\", "").replace(":", "").replace("'", "").replace('"', "").strip()
     if not texto_limpio or "PITOT" in texto_limpio or "FALLO FATAL" in texto_limpio:
         texto_limpio = "LA CINTA MORTAL"
     palabras = texto_limpio.split()
 
-    tamano_fuente = 152
-    margen_maximo = 1140
+    tamano_fuente = 132
+    margen_maximo = 1120
     dummy_draw = ImageDraw.Draw(lienzo)
 
     while tamano_fuente > 65:
         fuente = _obtener_fuente(tamano_fuente)
-        espacio = int(tamano_fuente * 0.28)
+        espacio = int(tamano_fuente * 0.26)
         anchos_palabras = [dummy_draw.textbbox((0, 0), p, font=fuente)[2] for p in palabras]
         ancho_total = sum(anchos_palabras) + espacio * (len(palabras) - 1)
         if ancho_total <= margen_maximo:
@@ -96,7 +93,7 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
     bbox_ref = dummy_draw.textbbox((0, 0), texto_limpio, font=fuente)
     alto_texto = bbox_ref[3] - bbox_ref[1]
     x_inicial = (ANCHO - ancho_total) // 2
-    y_pos = ALTO - alto_texto - 70 - bbox_ref[1]
+    y_pos = ALTO - alto_texto - 42 - bbox_ref[1]
 
     capa_sombra_amplia = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
     draw_sombra_amplia = ImageDraw.Draw(capa_sombra_amplia)
@@ -124,7 +121,7 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
         )
         x_cursor += anchos_palabras[i] + espacio
 
-    capa_sombra_amplia = capa_sombra_amplia.filter(ImageFilter.GaussianBlur(radius=18))
+    capa_sombra_amplia = capa_sombra_amplia.filter(ImageFilter.GaussianBlur(radius=16))
     capa_sombra_corta = capa_sombra_corta.filter(ImageFilter.GaussianBlur(radius=4))
 
     lienzo = Image.alpha_composite(lienzo, capa_sombra_amplia)
@@ -157,8 +154,8 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
 
     lienzo = Image.alpha_composite(lienzo, capa_trazo)
 
-    y_top = max(0, ALTO - alto_texto - 90)
-    alto_grad = min(ALTO - y_top, alto_texto + 60)
+    y_top = max(0, ALTO - alto_texto - 65)
+    alto_grad = min(ALTO - y_top, alto_texto + 50)
 
     grad_blanco = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
     grad_blanco.paste(_crear_gradiente_vertical(ANCHO, alto_grad, (255, 255, 255), (215, 220, 230)), (0, y_top))
