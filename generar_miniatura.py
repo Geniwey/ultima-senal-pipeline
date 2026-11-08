@@ -32,11 +32,11 @@ def _obtener_fuente(tamano: int) -> ImageFont.FreeTypeFont:
 
 def _encuadrar_y_realzar_protagonista(imagen: Image.Image) -> Image.Image:
     lienzo = ImageOps.fit(imagen, (ANCHO, ALTO), method=Image.Resampling.LANCZOS)
-    # Moderar saturación (-12%) para evitar azules demasiado eléctricos y dar aspecto metálico real
-    lienzo = ImageEnhance.Color(lienzo).enhance(0.88)
-    lienzo = ImageEnhance.Brightness(lienzo).enhance(1.18)
-    lienzo = ImageEnhance.Contrast(lienzo).enhance(1.14)
-    lienzo = lienzo.filter(ImageFilter.UnsharpMask(radius=1.8, percent=125, threshold=3))
+    # Recuperar azul intenso, brillo y alto contraste estilo miniatura 9/10 para máximo CTR en móviles
+    lienzo = ImageEnhance.Brightness(lienzo).enhance(1.24)
+    lienzo = ImageEnhance.Contrast(lienzo).enhance(1.22)
+    lienzo = ImageEnhance.Color(lienzo).enhance(1.14)
+    lienzo = lienzo.filter(ImageFilter.UnsharpMask(radius=2.0, percent=140, threshold=3))
     base = lienzo.convert("RGBA")
 
     capa_oscura = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
@@ -45,7 +45,7 @@ def _encuadrar_y_realzar_protagonista(imagen: Image.Image) -> Image.Image:
     inicio_y = 530
     for y in range(inicio_y, ALTO):
         progreso = (y - inicio_y) / (ALTO - inicio_y)
-        alpha = int(185 * (progreso ** 1.6))
+        alpha = int(190 * (progreso ** 1.6))
         draw.line([(0, y), (ANCHO, y)], fill=(0, 0, 0, alpha))
 
     return Image.alpha_composite(base, capa_oscura)
@@ -77,7 +77,7 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
         texto_limpio = "LA CINTA MORTAL"
     palabras = texto_limpio.split()
 
-    tamano_fuente = 132
+    tamano_fuente = 134
     margen_maximo = 1120
     dummy_draw = ImageDraw.Draw(lienzo)
 
