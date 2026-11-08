@@ -8,47 +8,51 @@ MODELO_PRINCIPAL = "openai/gpt-oss-120b"
 MODELO_FALLBACK = "openai/gpt-oss-20b"
 MODELO_CEREBRAS = "llama-3.3-70b"
 
-SYSTEM_PROMPT = """Eres un director de documentales forenses de aviación para YouTube. Narra el caso en 38 escenas con una LÍNEA TEMPORAL ESTRICTAMENTE LINEAL de principio a fin.
+SYSTEM_PROMPT = """Eres el director jefe de un canal documental de aviación de élite en YouTube. Tu misión es escribir un guion de 34 escenas (4.5 a 5.5 minutos) con retención magnética y rigor forense absoluto.
 
-ESTRUCTURA CRONOLÓGICA ÚNICA:
-- Escenas 1 a 6 (El Error en Tierra): Noche del 1 al 2 de octubre de 1996 en Lima. El empleado Eleuterio Chacaliaza tapa los tres puertos estáticos del Boeing 757-200 con cinta adhesiva plateada para pulir el fuselaje. Termina su turno y nadie retira la cinta.
-- Escenas 7 a 12 (El Despegue): 00:40 de la madrugada. El Capitán Eric Schreiber y el Copiloto David Fernández entran a la cabina de mando y despegan con 70 personas rumbo a Santiago. Al cruzar los 1000 pies en la niebla, el velocímetro y el altímetro quedan bloqueados.
-- Escenas 13 a 24 (Ciegos sobre el Pacífico): En la torre de Lima ven 9700 pies porque el transpondedor recibe el mismo dato falso del sensor tapado. En la cabina de mando saltan alarmas contradictorias de baja velocidad y exceso de velocidad.
-- Escenas 25 a 30 (El Impacto): A la una y once de la madrugada (31 minutos de vuelo), creyendo estar a 9700 pies, el ala izquierda roza las olas del océano Pacífico. El avión se invierte y se estrella en el mar. Fallecen los 70 ocupantes.
-- Escenas 31 a 38 (Hallazgo y Cambio Mundial): Barcos de la Marina iluminan fragmentos flotantes al amanecer. Un robot submarino recupera la caja negra a 150 metros de profundidad. Se descubre la cinta en el fuselaje y la OACI obliga a usar cubiertas protectoras con banderines rojos de retirar antes del vuelo.
+FICHA OFICIAL VERIFICADA (PROHIBIDO INVENTAR DATOS FUERA DE ESTA FICHA):
+- Vuelo: Aeroperú 603 (Boeing 757-200, matrícula N52AW). Fecha: 2 de octubre de 1996. Ruta: Lima (Perú) a Santiago (Chile).
+- Víctimas: 70 ocupantes (61 pasajeros y 9 tripulantes). Fallecieron todos. No hubo explosión submarina; el avión se partió al impactar el agua a alta velocidad tras rozar las olas con el ala izquierda.
+- Causa oficial (Informe CIAA): El técnico Eleuterio Chacaliaza tapó los 3 puertos estáticos del lado izquierdo con cinta adhesiva plateada para lavar y pulir el fuselaje. Nadie retiró la cinta en el cambio de turno ni en la inspección exterior prevuelo.
+- Cronología exacta:
+  * 00:40 AM: Despegue de Lima con el Capitán Eric Schreiber y el Copiloto David Fernández.
+  * 00:42 AM: Al subir entre la niebla nocturna, el altímetro y el velocímetro quedan congelados/erráticos.
+  * 00:44 AM: Declaran emergencia. La torre de Lima ve 9700 pies en su radar porque el transpondedor del avión recibe el dato falso del mismo sensor tapado.
+  * 00:50 a 01:10 AM: En cabina saltan alarmas contradictorias (vibrador de pérdida por baja velocidad y alarma de exceso de velocidad a la vez, más alarma de terreno GPWS que los pilotos creen falsa).
+  * 01:11 AM (31 minutos de vuelo): Creyendo estar a 9700 pies sobre el mar, el ala izquierda golpea las olas frente a Chancay. El avión gira invertido y se estrella en el Pacífico.
 
-REGLAS ESTRICTAS DE RÓTULOS ("texto_pantalla"):
-- PROHIBIDO CORTAR O ABREVIAR PALABRAS (NUNCA escribas "VELOCÍMETRO BLO", "LISTA DE VERIF", "INDICADORES CONTRA", "VIBRACIÓN CRÍT", "SOLICITUD CONTRO", "TURBULENCIA INVIS", "CAJA NEGRA RECUP" ni "ENTRENAMIENTO PILOT"). Escribe SIEMPRE las palabras enteras.
-- NUNCA traduzcas "cockpit" como "cocina"; escribe siempre "CABINA DE MANDO".
-- Cuida la concordancia en español ("NIEBLA DENSA", nunca "NIEBLA DENSO").
-- Usa de 2 a 3 palabras completas en MAYÚSCULAS (máximo 24 caracteres en total).
+ESTRUCTURA DE RETENCIÓN 10/10:
+1. GANCHO EN FRÍO (Escenas 1 y 2): PROHIBIDO empezar con "En la noche del 1 de octubre...". Abre los primeros 10 segundos en pleno clímax: a medianoche sobre el Pacífico, todas las alarmas suenan a la vez mientras 70 personas caen hacia el mar negro por culpa de un trozo de cinta adhesiva de dos dólares. Luego rebobina al hangar.
+2. GIROS DE RETENCIÓN CADA 5 ESCENAS: Plantea micro-preguntas o giros tensos ("Pero había una trampa oculta que ni siquiera la torre de control podía ver...", "Lo que los pilotos no sabían es que el radar les estaba mintiendo...").
+3. CIERRE CON PREGUNTA ABIERTA: La última escena cierra con la lección del caso y una pregunta directa sobre la responsabilidad en seguridad aérea.
 
-REGLAS DE VARIEDAD VISUAL ("prompt_imagen" - PROHIBIDO REPETIR PLANOS O PONER TÚNELES):
-- NO repitas el plano de los dos pilotos de espaldas más de 2 veces en todo el vídeo.
-- PROHIBIDO pedir túneles, pasillos subterráneos o interiores de edificios en las escenas finales.
-- Alterna constantemente entre planos exteriores del avión en las nubes, motores, alas sobre el mar, torre de control en la niebla, barco de rescate, robot submarino, caja negra y primer plano de los banderines rojos "Remove Before Flight" en el fuselaje de un avión en pista al amanecer.
+REGLAS DE RÓTULOS ("texto_pantalla"):
+- 2 a 3 palabras COMPLETAS en español (máximo 22 caracteres). PROHIBIDO cortar palabras y PROHIBIDO inventar "EXPLOSIÓN SUBMARINA".
 
-Devuelve ÚNICAMENTE un JSON válido:
+REGLAS DE IMAGEN ("prompt_imagen"):
+- Cada prompt debe describir visualmente la frase exacta de esa escena, pero NUNCA pidas: libros, cuadernos, informes en papel, tablones con fotos, lápidas, cruces, monumentos con texto, ni aviones flotando enteros en el mar.
+- Para el impacto y el mar, pide únicamente olas oscuras del océano de noche con haces de luz de búsqueda o pequeños fragmentos metálicos irreconocibles entre la espuma.
+
+Devuelve ÚNICAMENTE un JSON válido con 34 escenas:
 {
-  "titulo_video": "Título intrigante de máximo 60 caracteres",
-  "descripcion_youtube": "Descripción de 3 párrafos con datos verificados y cita al Informe Oficial de la CIAA.",
-  "tags_youtube": ["aviacion", "documental", "aeroperu 603", "caja negra"],
-  "comentario_fijado": "Pregunta de debate sobre el caso",
-  "prompt_miniatura": "Extreme macro close-up of a piece of glossy silver-grey industrial duct tape with sticky adhesive edges partially covering a round metallic static port sensor on a dark navy blue airplane fuselage, lightning bolt in the night sky, realistic studio lighting, no text, no letters",
+  "titulo_video": "El error de 2$ que derribó al Vuelo 603 (Caso Aeroperú)",
+  "descripcion_youtube": "Descripción documental de 3 párrafos con ficha técnica, cita al Informe Oficial de la CIAA y aviso de recreación visual.",
+  "tags_youtube": ["aeroperu 603", "misterios de aviacion", "documental aereo", "caja negra", "seguridad aerea"],
+  "comentario_fijado": "¿Crees que la culpa principal fue del técnico que puso la cinta o del protocolo de inspección antes del despegue? Te leo abajo.",
+  "prompt_miniatura": "Extreme macro close-up of a strip of glossy silver-grey metallic duct tape partially covering a round chrome static port sensor on a deep electric-blue Boeing 757 fuselage, bright white lightning bolt in the stormy night sky reflecting on wet metal, high contrast, 8k, no text",
   "titulo_miniatura": "LA CINTA MORTAL",
   "escenas": [
     {
-      "texto_narracion": "Narración 100% en español (sin palabras en inglés como cockpit o Remove Before Flight) y números juntos como 9700 pies...",
-      "texto_pantalla": "2-3 PALABRAS COMPLETAS",
+      "texto_narracion": "Frase potente de 18 a 25 palabras...",
+      "texto_pantalla": "RÓTULO CORTO Y REAL",
       "duracion_segundos": 6.0,
-      "prompt_imagen": "Well-lit cinematic description matching the exact action of the scene, unmarked surface, no text"
+      "prompt_imagen": "Descripción cinematográfica en inglés sin texto ni papeles ni aviones flotando"
     }
   ]
 }"""
 
-
-# Diccionario que repara automáticamente cualquier palabra truncada o mal traducida por el LLM
 REPARACION_ROTULOS = {
+    r"\bEXPLOSI[ÓO]N SUBMARINA\b": "IMPACTO EN EL PACÍFICO",
     r"\bCOCINA\b": "CABINA",
     r"\bNIEBLA DENSO\b": "NIEBLA DENSA",
     r"\bVERIF\b": "VERIFICACIÓN",
@@ -59,22 +63,8 @@ REPARACION_ROTULOS = {
     r"\bINVIS\b": "INVISIBLE",
     r"\bRECUP\b": "HALLADA",
     r"\bPILOT\b": "PILOTOS",
-    r"\bESTÁT\b": "ESTÁTICOS",
-    r"\bMANTENIM\b": "MANTENIMIENTO",
-    r"\b VELOC\b": " VELOCIDAD",
-    r"\bINSTRUM\b": "INSTRUMENTOS",
     r"\bFUSELAGE\b": "FUSELAJE",
 }
-
-# Rotación de planos cinematográficos variados para evitar que se repita la cabina o salgan túneles
-PLANOS_VARIADOS_VUELO = [
-    "Exterior side view of a commercial Boeing 757 flying through dark night clouds with moonbeams reflecting on the blank metallic fuselage, well-lit, no text",
-    "Close-up of a commercial airliner jet engine turbine spinning in heavy night mist with warm runway lights reflecting on wet metal, no text",
-    "View from the wingtip of a commercial airliner banking left above dark ocean clouds at night, glowing red navigation light, no text",
-    "Airport air traffic control tower illuminated by amber floodlights in night fog overlooking a wet tarmac, cinematic, no text",
-    "Low angle shot of a commercial airliner flying low over dark ocean waves at night with landing lights piercing the fog, no text",
-    "Close-up of aircraft nose cone and windshield wipers in heavy night rain, dramatic studio lighting, no text",
-]
 
 
 def _llamar_groq(cliente: Groq, tema: str, modelo: str) -> str:
@@ -82,7 +72,7 @@ def _llamar_groq(cliente: Groq, tema: str, modelo: str) -> str:
         model=modelo,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Documenta con palabras completas sin truncar y máxima variedad visual el caso: {tema}"},
+            {"role": "user", "content": f"Escribe el guion definitivo con Gancho en Frío en la escena 1 y rigor total sobre: {tema}"},
         ],
         temperature=0.4,
         max_tokens=16000,
@@ -100,7 +90,7 @@ def _llamar_cerebras(tema: str) -> str:
         model=MODELO_CEREBRAS,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Documenta con palabras completas sin truncar y máxima variedad visual el caso: {tema}"},
+            {"role": "user", "content": f"Escribe el guion definitivo con Gancho en Frío en la escena 1 y rigor total sobre: {tema}"},
         ],
         temperature=0.4,
         max_tokens=16000,
@@ -115,11 +105,10 @@ def _reparar_rotulo(rotulo: str) -> str:
     return r
 
 
-def _deduplicar_y_blindar_escenas(escenas: list) -> list:
-    escenas_filtradas = []
+def _procesar_y_enriquecer_escenas(escenas: list) -> list:
+    escenas_limpias = []
     rotulos_vistos = set()
     frases_vistas = set()
-    contador_cabina = 0
 
     for idx, esc in enumerate(escenas):
         narracion = esc.get("texto_narracion", "").strip()
@@ -129,50 +118,49 @@ def _deduplicar_y_blindar_escenas(escenas: list) -> list:
         if not narracion:
             continue
 
-        # Limpiar anglicismos y números partidos con espacio en la narración
+        # Prohibir la alucinación de la explosión submarina en la voz y en el rótulo
+        if "explosión" in narracion.lower() and "agua" in narracion.lower():
+            narracion = "La violencia del impacto contra las olas partió la estructura del avión en segundos, apagando toda señal en mitad de la noche."
         narracion = re.sub(r"(\d)\s+(\d{3})\b", r"\1\2", narracion)
         narracion = re.sub(r"\bcockpit\b", "cabina de mando", narracion, flags=re.IGNORECASE)
-        narracion = re.sub(r"\bRemove Before Flight\b", "retirar antes del vuelo", narracion, flags=re.IGNORECASE)
-        narracion = re.sub(r"[Aa] los (1:11|una once)", "A la una y once de la madrugada", narracion)
 
-        # Limitar planos de cabina ("cockpit" / "pilots") a máximo 2 en todo el vídeo para no cansar
-        es_plano_cabina = any(k in prompt_img.lower() for k in ("cockpit", "pilot", "shoulder", "windshield"))
-        if es_plano_cabina:
-            contador_cabina += 1
-            if contador_cabina > 2:
-                prompt_img = PLANOS_VARIADOS_VUELO[idx % len(PLANOS_VARIADOS_VUELO)]
-
-        # Reemplazar túneles, pasillos o imágenes abstractas en las escenas de normas/investigación
-        if any(k in prompt_img.lower() for k in ("tunnel", "corridor", "hallway", "subway", "radar", "abstract", "blur")):
-            prompt_img = PLANOS_VARIADOS_VUELO[idx % len(PLANOS_VARIADOS_VUELO)]
-
-        if any(k in rotulo.lower() for k in ("norma", "bander", "regla", "inspecc", "lecci", "entrenam")):
-            prompt_img = (
-                "Close-up of a bright red safety streamer ribbon hanging from a metallic sensor cover on the side "
-                "of a commercial airliner parked on a sunlit airport apron at dawn, cinematic, no text, no letters"
-            )
-
-        if any(k in rotulo.lower() for k in ("resto", "silencio", "marina", "impacto", "pacífico")):
-            prompt_img = (
-                "Small floating metal aircraft debris fragments on dark ocean waves at dawn illuminated by "
-                "a naval rescue ship searchlight in the distance, no whole airplanes, no text"
-            )
-
-        firma_narracion = " ".join(re.findall(r"[a-záéíóúñ]+", narracion.lower())[:7])
-        if firma_narracion in frases_vistas:
+        firma = " ".join(re.findall(r"[a-záéíóúñ]+", narracion.lower())[:7])
+        if firma in frases_vistas:
             continue
-        frases_vistas.add(firma_narracion)
+        frases_vistas.add(firma)
 
         if rotulo in rotulos_vistos:
             rotulo = f"{rotulo} II"
         rotulos_vistos.add(rotulo)
 
+        # Bloquear objetos que generan texto basura (libretas, lápidas, tablones, aviones flotando enteros)
+        if any(w in prompt_img.lower() for w in ("notebook", "logbook", "book", "paper", "board", "chart", "plaque", "memorial", "tombstone", "cross", "grave")):
+            prompt_img = (
+                "Cinematic close-up of a commercial airliner metallic fuselage and wing under dramatic amber hangar floodlights at night, "
+                "rain droplets on dark metal, shallow depth of field, no text, no letters"
+            )
+        if any(w in prompt_img.lower() for w in ("floating", "ocean", "sea", "water", "debris", "wreckage")) and "wingtip" not in prompt_img.lower():
+            prompt_img = (
+                "Dark turbulent ocean waves at night illuminated by a bright white searchlight beam from a distant naval rescue ship "
+                "cutting through sea mist, dramatic atmosphere, no airplanes on water, no text"
+            )
+
         esc["texto_narracion"] = narracion
         esc["texto_pantalla"] = rotulo
         esc["prompt_imagen"] = prompt_img
-        escenas_filtradas.append(esc)
+        escenas_limpias.append(esc)
 
-    return escenas_filtradas[:40]
+    escenas_limpias = escenas_limpias[:36]
+    total = len(escenas_limpias)
+
+    # Inyectar las 4 Infografías de Datos Reales hechas con código en los puntos exactos de la historia
+    if total >= 20:
+        escenas_limpias[3]["prompt_imagen"] = "INFOGRAFIA:ESQUEMA_SENSORES"
+        escenas_limpias[int(total * 0.35)]["prompt_imagen"] = "INFOGRAFIA:MAPA_RUTA"
+        escenas_limpias[int(total * 0.55)]["prompt_imagen"] = "INFOGRAFIA:GRAFICA_ALTITUD"
+        escenas_limpias[int(total * 0.78)]["prompt_imagen"] = "INFOGRAFIA:CRONOLOGIA"
+
+    return escenas_limpias
 
 
 def _limpiar_y_parsear(texto: str) -> dict:
@@ -181,24 +169,23 @@ def _limpiar_y_parsear(texto: str) -> dict:
     match = re.search(r"\{.*\}", texto, re.DOTALL)
     datos = json.loads(match.group(0)) if match else json.loads(texto.strip())
 
-    datos["escenas"] = _deduplicar_y_blindar_escenas(datos.get("escenas", []))
-
-    titulo_min = datos.get("titulo_miniatura", "").strip().upper()
-    if not titulo_min or "PITOT" in titulo_min or "FALLO FATAL" in titulo_min:
-        datos["titulo_miniatura"] = "LA CINTA MORTAL"
-
+    datos["escenas"] = _procesar_y_enriquecer_escenas(datos.get("escenas", []))
+    datos["titulo_miniatura"] = "LA CINTA MORTAL"
     datos["prompt_miniatura"] = (
-        "Extreme macro close-up of a strip of glossy silver-grey metallic duct tape with sticky adhesive edges "
-        "partially covering a round chrome static port sensor on a dark slate-blue Boeing 757 fuselage, "
-        "lightning bolt in the night sky reflecting on wet metal, hyper-realistic photography, no fabric texture, no text"
+        "Extreme macro close-up of a strip of glossy silver-grey metallic duct tape partially covering a round chrome "
+        "static port sensor on a vibrant deep electric-blue Boeing 757 fuselage, bright white lightning bolt in the "
+        "stormy night sky reflecting on wet metal, high contrast, 8k, no text, no letters"
     )
 
-    desc = datos.get("descripcion_youtube", "")
-    if "Fuente" not in desc and "Informe" not in desc:
-        desc = (
-            desc.strip()
-            + "\n\n📋 Fuente oficial verificada: Informe Final de la Comisión Investigadora de Accidentes de Aviación (CIAA - Ministerio de Transportes del Perú), anexos de la OACI y NTSB."
-        )
+    desc = datos.get("descripcion_youtube", "").strip()
+    aviso_legal = (
+        "\n\n📋 Fuente oficial verificada: Informe Final de la Comisión Investigadora de Accidentes de Aviación "
+        "(CIAA - Ministerio de Transportes del Perú), anexos técnicos de la OACI y NTSB."
+        "\nℹ️ Nota de transparencia: Las secuencias visuales de este documental son recreaciones cinematográficas "
+        "e infografías técnicas generadas digitalmente para ilustrar los hechos reales del informe oficial."
+    )
+    if "Fuente oficial" not in desc:
+        desc += aviso_legal
     datos["descripcion_youtube"] = desc
     return datos
 
@@ -214,7 +201,7 @@ def generar_guion(tema: str) -> dict:
             print(f"Llamando a Groq ({modelo})...")
             texto = _llamar_groq(cliente, tema, modelo)
             datos = _limpiar_y_parsear(texto)
-            if "escenas" in datos and len(datos["escenas"]) >= 25:
+            if "escenas" in datos and len(datos["escenas"]) >= 24:
                 return datos
         except Exception as e:
             print(f" Fallo con {modelo}: {e}")
@@ -223,7 +210,7 @@ def generar_guion(tema: str) -> dict:
         print("Groq falló, probando Cerebras...")
         texto = _llamar_cerebras(tema)
         datos = _limpiar_y_parsear(texto)
-        if "escenas" in datos and len(datos["escenas"]) >= 25:
+        if "escenas" in datos and len(datos["escenas"]) >= 24:
             return datos
     except Exception as e:
         print(f" Fallo con Cerebras: {e}")
