@@ -26,10 +26,9 @@ def animar_imagen(ruta_imagen: str, duracion_segundos: float, ruta_salida: str, 
     filtro_normalizar = f"scale={ANCHO}:{ALTO}:force_original_aspect_ratio=increase,crop={ANCHO}:{ALTO},setsar=1"
     filtro_zoompan = f"{filtro_normalizar},zoompan=z='{z_ini}+{incremento}*on':x='{variante['pan_x']}':y='{variante['pan_y']}':d={num_frames}:s={ANCHO}x{ALTO}:fps={FPS}"
 
-    filtros = [filtro_zoompan, "vignette=angle=PI/4"]
+    filtros = [filtro_zoompan, "vignette=angle=PI/4.5"]
 
     if texto_pantalla:
-        # CERO recorte de caracteres: se muestra el rótulo completo y se adapta el fontsize si es largo
         texto_seguro = (
             texto_pantalla.strip().upper()
             .replace("\\", "")
@@ -39,11 +38,12 @@ def animar_imagen(ruta_imagen: str, duracion_segundos: float, ruta_salida: str, 
             .replace("%", "")
         )
         tamano_letra = 64 if len(texto_seguro) <= 22 else max(46, int(1400 / len(texto_seguro)))
+        # Caja oscura al 85% (black@0.85) + borde de 4px para contraste total incluso sobre turbinas o luces blancas
         filtros.append(
             f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize={tamano_letra}:"
-            f"font='DejaVu Sans Bold':borderw=3:bordercolor=black@0.9:"
-            f"box=1:boxcolor=black@0.68:boxborderw=18:"
-            f"x=(w-text_w)/2:y=h-text_h-110:"
+            f"font='DejaVu Sans Bold':borderw=4:bordercolor=black@1.0:"
+            f"box=1:boxcolor=black@0.85:boxborderw=22:"
+            f"x=(w-text_w)/2:y=h-text_h-95:"
             f"alpha='if(lt(t,0.3),t/0.3,1)'"
         )
 
