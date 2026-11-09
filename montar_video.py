@@ -33,7 +33,7 @@ def _concatenar_audios(rutas_audio: list, ruta_salida: str):
 def _concatenar_video(rutas_clips: list, ruta_salida: str):
     rutas_validas = [r for r in rutas_clips if os.path.exists(r) and os.path.getsize(r) > 1000]
     if len(rutas_validas) <= 2:
-        raise RuntimeError(f"Error crítico: Solo existen {len(rutas_validas)} clips válidos. Falló la generación de clips.")
+        raise RuntimeError(f"Error crítico: Solo existen {len(rutas_validas)} clips válidos.")
     lista_txt = ruta_salida + "_lista.txt"
     with open(lista_txt, "w", encoding="utf-8") as f:
         for ruta in rutas_validas:
@@ -89,10 +89,10 @@ def montar_video_final(carpeta_clips: str, carpeta_audios: str, ruta_salida: str
     audio_con_ambiente = ruta_salida + "_audio_con_ambiente_temp.mp3"
     mezclar_con_narracion(audio_temp, ruta_ambiente, audio_con_ambiente)
 
-    # Normalización ajustada a -16 LUFS y True Peak en -2.5 dB para evitar cualquier saturación
+    # Normalización a -17 LUFS + Limitador físico (alimiter=limit=0.79 = -2.0 dB máx) para que NUNCA toque 0.0 dB
     comando = [
         "ffmpeg", "-y", "-i", video_temp, "-i", audio_con_ambiente,
-        "-af", "loudnorm=I=-16:TP=-2.5:LRA=9",
+        "-af", "loudnorm=I=-17:TP=-2.5:LRA=9,alimiter=limit=0.79:level=disabled:attack=5:release=50",
         "-c:v", "copy",
         "-c:a", "aac", "-b:a", "192k",
         "-map", "0:v:0", "-map", "1:a:0", "-shortest", ruta_salida,
