@@ -2,15 +2,14 @@ import os
 import sys
 import time
 import base64
-import random
 import requests
 import urllib.parse
 import re
 
 ESTILO_BASE = (
-    "cinematic documentary photography, well-lit scene, bright rim lighting, clear visibility, "
+    "cinematic documentary photography, exterior or macro mechanical shot, balanced moody lighting, "
     "8k resolution, photorealistic, unmarked blank metallic surface, smooth texture, "
-    "no airline logos, NO TEXT, NO LETTERS, NO NUMBERS, NO SIGNS, NO WRITING"
+    "NO PEOPLE, NO FACES, NO PORTRAITS, NO TABLETS, NO SCREENS, NO TEXT, NO LETTERS, NO NUMBERS"
 )
 
 TIMEOUT = 35
@@ -21,11 +20,8 @@ _ultima_fue_emergencia = [False]
 
 def _generar_infografia_codigo(tipo: str, ruta_salida: str) -> bool:
     """
-    Genera infografías técnicas 100% reales y limpias con Matplotlib (cero texto basura de IA):
-    1. GRAFICA_ALTITUD: Altitud Falsa (9700 ft) vs Altitud Real (Impacto 0 ft).
-    2. MAPA_RUTA: Trayectoria Lima -> Pacífico -> Punto de impacto en Chancay.
-    3. CRONOLOGIA: Línea de tiempo de los 31 minutos fatales.
-    4. ESQUEMA_SENSORES: Comparativa de Puerto Estático Libre vs Bloqueado con Cinta.
+    Renderiza las 4 infografías en 1920x1080 nativo con márgenes de seguridad del 15%
+    y fuentes grandes para que se lean perfecto en móvil y NUNCA se corten por los bordes.
     """
     try:
         import matplotlib
@@ -35,9 +31,12 @@ def _generar_infografia_codigo(tipo: str, ruta_salida: str) -> bool:
 
         plt.rcParams["font.sans-serif"] = "DejaVu Sans"
         plt.rcParams["axes.edgecolor"] = "#2A3F5F"
-        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=100)
+        fig, ax = plt.subplots(figsize=(19.2, 10.8), dpi=100)
         fig.patch.set_facecolor("#070B12")
         ax.set_facecolor("#0B1320")
+
+        # Márgenes amplios de seguridad (deja espacio arriba para el título y abajo para el rótulo del vídeo)
+        fig.subplots_adjust(left=0.12, right=0.92, top=0.84, bottom=0.22)
 
         if "GRAFICA_ALTITUD" in tipo:
             minutos = np.linspace(0, 31, 200)
@@ -55,105 +54,112 @@ def _generar_infografia_codigo(tipo: str, ruta_salida: str) -> bool:
                     lambda t: 4500 * (1.0 - ((t - 18.0) / 13.0) ** 1.4),
                 ],
             )
-            ax.plot(minutos, alt_falsa, color="#FFAA00", linewidth=3.5, linestyle="--", label="ALTÍMETRO EN CABINA / RADAR (BLOQUEADO EN 9700 PIES)")
-            ax.plot(minutos, alt_real, color="#FF2A2A", linewidth=4.2, label="ALTITUD REAL DEL AVIÓN (DESCENSO CIEGO HACIA EL MAR)")
-            ax.fill_between(minutos, alt_real, 0, color="#FF2A2A", alpha=0.15)
-            ax.scatter([31], [0], color="#FFFFFF", s=140, zorder=5)
-            ax.annotate("01:11 AM - IMPACTO EN EL MAR (0 PIES)", xy=(31, 150), xytext=(19.5, 2200),
-                        color="#FFFFFF", fontweight="bold", fontsize=12,
-                        arrowprops=dict(facecolor="#FF2A2A", shrink=0.08, width=2))
-            ax.set_title("TELEMETRÍA FORENSE FDR: LECTURA FALSA VS ALTITUD REAL", color="#FFFFFF", fontsize=16, fontweight="bold", pad=18)
-            ax.set_xlabel("TIEMPO DE VUELO (MINUTOS DESDE EL DESPEGUE EN LIMA)", color="#A0B4D0", fontsize=12, fontweight="bold")
-            ax.set_ylabel("ALTITUD (PIES)", color="#A0B4D0", fontsize=12, fontweight="bold")
-            ax.set_ylim(-500, 11500)
-            ax.set_xlim(0, 33)
-            ax.grid(True, color="#1C2D42", linestyle=":", linewidth=1)
-            ax.tick_params(colors="#A0B4D0", labelsize=11)
-            leg = ax.legend(loc="upper right", facecolor="#070B12", edgecolor="#2A3F5F", fontsize=11)
+            ax.plot(minutos, alt_falsa, color="#FFAA00", linewidth=5.0, linestyle="--", label="LECTURA FALSA EN CABINA / RADAR (9700 PIES)")
+            ax.plot(minutos, alt_real, color="#FF2A2A", linewidth=6.0, label="ALTITUD REAL DEL AVIÓN (DESCENSO AL MAR)")
+            ax.fill_between(minutos, alt_real, 0, color="#FF2A2A", alpha=0.18)
+            ax.scatter([31], [0], color="#FFFFFF", s=240, zorder=5)
+            ax.annotate(
+                "01:11 AM - IMPACTO (0 PIES)",
+                xy=(30.8, 200),
+                xytext=(16.5, 2600),
+                color="#FFFFFF",
+                fontweight="bold",
+                fontsize=18,
+                arrowprops=dict(facecolor="#FF2A2A", shrink=0.08, width=3),
+            )
+            ax.set_title("DATOS CAJA NEGRA (FDR): ALTITUD FALSA VS REAL", color="#FFFFFF", fontsize=24, fontweight="bold", pad=22)
+            ax.set_xlabel("MINUTOS DE VUELO DESDE EL DESPEGUE (LIMA)", color="#B0C4DE", fontsize=17, fontweight="bold", labelpad=12)
+            ax.set_ylabel("ALTITUD (PIES)", color="#B0C4DE", fontsize=17, fontweight="bold", labelpad=12)
+            ax.set_ylim(-600, 12200)
+            ax.set_xlim(0, 34)
+            ax.grid(True, color="#1C2D42", linestyle=":", linewidth=1.5)
+            ax.tick_params(colors="#FFFFFF", labelsize=15)
+            leg = ax.legend(loc="upper left", facecolor="#070B12", edgecolor="#2A3F5F", fontsize=16)
             for text in leg.get_texts():
                 text.set_color("#FFFFFF")
 
         elif "MAPA_RUTA" in tipo:
-            # Mapa vectorial costero (Costa de Lima / Callao / Chancay)
             costa_x = [-77.05, -77.12, -77.16, -77.22, -77.27, -77.32]
             costa_y = [-12.20, -12.05, -11.90, -11.75, -11.60, -11.45]
-            ax.plot(costa_x, costa_y, color="#3A6080", linewidth=3, label="LÍNEA DE COSTA (PERÚ)")
-            ax.fill_betweenx(costa_y, costa_x, -76.80, color="#142230", alpha=0.8)
+            ax.plot(costa_x, costa_y, color="#4A7A9C", linewidth=4.5, label="COSTA DEL PERÚ")
+            ax.fill_betweenx(costa_y, costa_x, -76.80, color="#142230", alpha=0.85)
 
             ruta_x = [-77.11, -77.28, -77.42, -77.36, -77.25]
             ruta_y = [-12.02, -12.08, -11.92, -11.76, -11.65]
-            ax.plot(ruta_x, ruta_y, color="#00E5FF", linewidth=3.5, linestyle="-", label="TRAYECTORIA VUELO AEROPERÚ 603")
-            ax.scatter([-77.11], [-12.02], color="#00FF88", s=130, zorder=5)
-            ax.text(-77.09, -12.03, "LIMA (JORGE CHÁVEZ)\n00:40 AM", color="#00FF88", fontweight="bold", fontsize=11)
+            ax.plot(ruta_x, ruta_y, color="#00E5FF", linewidth=5.5, linestyle="-", label="RUTA VUELO AEROPERÚ 603")
+            ax.scatter([-77.11], [-12.02], color="#00FF88", s=240, zorder=5)
+            ax.text(-77.08, -12.04, "1. DESPEGUE LIMA (00:40 AM)", color="#00FF88", fontweight="bold", fontsize=17)
 
-            ax.scatter([-77.25], [-11.65], color="#FF2222", s=180, marker="X", zorder=6)
-            ax.text(-77.23, -11.66, "ZONA DE IMPACTO (CHANCAY)\n01:11 AM - OCÉANO PACÍFICO", color="#FF4444", fontweight="bold", fontsize=11)
+            ax.scatter([-77.25], [-11.65], color="#FF2222", s=300, marker="X", zorder=6)
+            ax.text(-77.22, -11.66, "2. IMPACTO EN EL MAR (01:11 AM)", color="#FF4444", fontweight="bold", fontsize=17)
 
-            ax.set_title("MAPA DE TRAYECTORIA RADAR: LIMA - SECTOR CHANCAY (PACÍFICO)", color="#FFFFFF", fontsize=16, fontweight="bold", pad=18)
-            ax.set_xlabel("LONGITUD OESTE", color="#A0B4D0", fontsize=11)
-            ax.set_ylabel("LATITUD SUR", color="#A0B4D0", fontsize=11)
-            ax.set_xlim(-77.55, -76.90)
-            ax.set_ylim(-12.20, -11.45)
-            ax.grid(True, color="#1C2D42", linestyle="--", linewidth=0.8)
-            ax.tick_params(colors="#A0B4D0")
-            leg = ax.legend(loc="lower left", facecolor="#070B12", edgecolor="#2A3F5F", fontsize=11)
+            ax.set_title("TRAYECTORIA RADAR: SALIDA DE LIMA Y GIRO AL PACÍFICO", color="#FFFFFF", fontsize=24, fontweight="bold", pad=22)
+            ax.set_xlabel("LONGITUD OESTE", color="#B0C4DE", fontsize=16, fontweight="bold")
+            ax.set_ylabel("LATITUD SUR", color="#B0C4DE", fontsize=16, fontweight="bold")
+            ax.set_xlim(-77.52, -76.88)
+            ax.set_ylim(-12.18, -11.48)
+            ax.grid(True, color="#1C2D42", linestyle="--", linewidth=1.2)
+            ax.tick_params(colors="#FFFFFF", labelsize=14)
+            leg = ax.legend(loc="lower left", facecolor="#070B12", edgecolor="#2A3F5F", fontsize=16)
             for text in leg.get_texts():
                 text.set_color("#FFFFFF")
 
         elif "CRONOLOGIA" in tipo:
             ax.axis("off")
-            ax.set_title("CRONOLOGÍA OFICIAL DEL ACCIDENTE (INFORME CIAA)", color="#FFFFFF", fontsize=18, fontweight="bold", pad=20)
+            ax.set_title("CRONOLOGÍA OFICIAL (INFORME CIAA - 2 OCT 1996)", color="#FFFFFF", fontsize=25, fontweight="bold", pad=20)
             hitos = [
-                ("00:40 AM", "DESPEGUE EN LIMA", "El Boeing 757 despega con los 3 puertos estáticos tapados con cinta."),
-                ("00:42 AM", "INSTRUMENTOS CONGELADOS", "Al cruzar 1000 pies, velocímetro y altímetro dejan de responder."),
-                ("00:44 AM", "EMERGENCIA DECLARADA", "Los pilotos piden ayuda al control de Lima para volver a pista."),
-                ("00:58 AM", "TRAMPA EN EL RADAR (9700 PIES)", "El transpondedor envía el mismo dato falso a la torre de control."),
-                ("01:11 AM", "IMPACTO EN EL PACÍFICO", "El ala izquierda roza el mar en la oscuridad a los 31 min de vuelo."),
+                ("00:40 AM", "DESPEGUE EN LIMA", "El Boeing 757 despega con los puertos estáticos tapados con cinta."),
+                ("00:42 AM", "INSTRUMENTOS BLOQUEADOS", "A los 2 minutos, velocímetro y altímetro dejan de marcar datos reales."),
+                ("00:44 AM", "EMERGENCIA DECLARADA", "Los pilotos piden vectores a Lima para regresar a la pista."),
+                ("00:58 AM", "DATO FALSO (9700 PIES)", "El transpondedor envía la misma altitud congelada al radar de tierra."),
+                ("01:11 AM", "IMPACTO EN EL OCÉANO", "El ala izquierda golpea el agua en la oscuridad a los 31 min de vuelo."),
             ]
-            y_positions = [0.82, 0.65, 0.48, 0.31, 0.14]
-            ax.plot([0.18, 0.18], [0.14, 0.82], color="#00E5FF", linewidth=4, transform=ax.transAxes)
+            y_positions = [0.85, 0.67, 0.49, 0.31, 0.13]
+            ax.plot([0.20, 0.20], [0.13, 0.85], color="#00E5FF", linewidth=5, transform=ax.transAxes)
             for (hora, titulo, detalle), y in zip(hitos, y_positions):
                 color_punto = "#FF2A2A" if "IMPACTO" in titulo else "#FFAA00"
-                ax.scatter([0.18], [y], color=color_punto, s=180, zorder=5, transform=ax.transAxes)
-                ax.text(0.04, y, hora, color="#00E5FF", fontsize=14, fontweight="bold", va="center", transform=ax.transAxes)
-                ax.text(0.23, y + 0.02, titulo, color="#FFFFFF", fontsize=14, fontweight="bold", va="center", transform=ax.transAxes)
-                ax.text(0.23, y - 0.03, detalle, color="#B0C4DE", fontsize=11.5, va="center", transform=ax.transAxes)
+                ax.scatter([0.20], [y], color=color_punto, s=260, zorder=5, transform=ax.transAxes)
+                ax.text(0.04, y, hora, color="#00E5FF", fontsize=20, fontweight="bold", va="center", transform=ax.transAxes)
+                ax.text(0.24, y + 0.025, titulo, color="#FFFFFF", fontsize=20, fontweight="bold", va="center", transform=ax.transAxes)
+                ax.text(0.24, y - 0.035, detalle, color="#C0D4EE", fontsize=16, va="center", transform=ax.transAxes)
 
-        else:  # ESQUEMA_SENSORES
+        else:  # ESQUEMA_SENSORES (Con posiciones centradas 0.20, 0.50, 0.80 para no salirse jamás por los lados)
             ax.axis("off")
-            ax.set_title("ESQUEMA FORENSE: CÓMO LA CINTA ENGAÑÓ AL BOEING 757", color="#FFFFFF", fontsize=17, fontweight="bold", pad=20)
+            ax.set_title("INFORME FORENSE: CÓMO LA CINTA ENGAÑÓ AL AVIÓN", color="#FFFFFF", fontsize=25, fontweight="bold", pad=20)
             bloques = [
-                (0.18, "1. PUERTOS ESTÁTICOS\nTAPADOS CON CINTA", "La cinta adhesiva bloquea\nla entrada de presión exterior", "#FF3333"),
-                (0.50, "2. COMPUTADORA ADC\nCONGELADA", "Calcula una altitud fija falsa\nde 9700 pies en cabina", "#FFAA00"),
-                (0.82, "3. TRANSPONDEDOR\nY RADAR ENGAÑADOS", "La torre de Lima recibe el mismo\ndato erróneo de 9700 pies", "#00E5FF"),
+                (0.19, "1. SENSOR TAPADO\nCON CINTA", "Bloquea la entrada\nde presión exterior", "#FF3333"),
+                (0.50, "2. COMPUTADORA\nCONGELADA", "Fija una altitud falsa\nde 9700 pies", "#FFAA00"),
+                (0.81, "3. RADAR DE LIMA\nENGAÑADO", "Recibe el mismo dato\nfalso de 9700 pies", "#00E5FF"),
             ]
             for x, tit, desc, col in bloques:
-                bbox = dict(boxstyle="round,pad=0.8", facecolor="#101C2E", edgecolor=col, linewidth=3)
-                ax.text(x, 0.55, f"{tit}\n\n{desc}", color="#FFFFFF", fontsize=12.5, fontweight="bold",
-                        ha="center", va="center", bbox=bbox, transform=ax.transAxes)
-            ax.annotate("", xy=(0.35, 0.55), xytext=(0.31, 0.55), arrowprops=dict(facecolor="#FFFFFF", width=3), transform=ax.transAxes)
-            ax.annotate("", xy=(0.67, 0.55), xytext=(0.63, 0.55), arrowprops=dict(facecolor="#FFFFFF", width=3), transform=ax.transAxes)
+                bbox = dict(boxstyle="round,pad=0.7", facecolor="#101C2E", edgecolor=col, linewidth=4)
+                ax.text(
+                    x, 0.55, f"{tit}\n\n{desc}",
+                    color="#FFFFFF", fontsize=18, fontweight="bold",
+                    ha="center", va="center", bbox=bbox, transform=ax.transAxes,
+                )
+            ax.annotate("", xy=(0.35, 0.55), xytext=(0.32, 0.55), arrowprops=dict(facecolor="#FFFFFF", width=4), transform=ax.transAxes)
+            ax.annotate("", xy=(0.66, 0.55), xytext=(0.63, 0.55), arrowprops=dict(facecolor="#FFFFFF", width=4), transform=ax.transAxes)
 
-        plt.tight_layout()
-        fig.subplots_adjust(bottom=0.22)
         fig.savefig(ruta_salida, facecolor=fig.get_facecolor(), edgecolor="none")
         plt.close(fig)
-        print(f"  📊 [Infografía Real] Generada con éxito: {tipo}")
+        print(f"  📊 [Infografía 1080p] Generada con márgenes seguros: {tipo}")
         return _validar_imagen(ruta_salida)
     except Exception as e:
-        print(f"  [Aviso] Falló infografía matplotlib ({e}), pasando a render visual...")
+        print(f"  [Aviso] Falló infografía matplotlib ({e})...")
         return False
 
 
-def _enriquecer_prompt_sin_machacar(prompt: str) -> str:
+def _sanitizar_prompt_estricto(prompt: str) -> str:
+    """Elimina cualquier término que pueda generar caras humanas, iPads, libretas o texto."""
     limpio = re.sub(
-        r"\b(text|words|letters|labels|sign|signs|logo|logos|title|caption|inscription|stencil|writing|numbers|notebook|logbook|plaque|tombstone|memorial|board|papers)\b",
+        r"\b(face|faces|portrait|man|men|woman|women|person|people|pilot|pilots|mechanic|technician|passenger|passengers|human|head|eyes|ipad|tablet|screen|monitor|pad|document|paper|book|notebook|text|words|letters|labels|sign|logo|numbers|arrows)\b",
         "",
         prompt,
         flags=re.IGNORECASE,
     )
     if any(k in limpio.lower() for k in ("tape", "static", "port", "sensor")):
-        limpio += ", glossy metallic silver-grey adhesive duct tape with sticky edges, completely blank smooth metal"
+        limpio += ", glossy metallic silver-grey duct tape on smooth blank aircraft metal without any markings"
     return limpio.strip()
 
 
@@ -167,33 +173,35 @@ def _validar_imagen(ruta: str) -> bool:
     return cabecera.startswith(b"\x89PNG") or cabecera.startswith(b"\xff\xd8\xff")
 
 
-def _corregir_exposicion_oscura(ruta: str):
+def _recortar_marca_agua_y_exponer(ruta: str, recortar_borde_inferior: bool = False):
+    """
+    Si viene de Pollinations, recorta el 6% inferior/derecho para eliminar la marca 'pollinations.ai'.
+    Además, equilibra la exposición si la imagen es demasiado oscura.
+    """
     try:
         import numpy as np
         from PIL import Image, ImageEnhance
 
         img = Image.open(ruta).convert("RGB")
+        w, h = img.size
+        if recortar_borde_inferior:
+            img = img.crop((int(w * 0.03), int(h * 0.03), int(w * 0.94), int(h * 0.92))).resize((1920, 1080), Image.Resampling.LANCZOS)
+
         arr = np.array(img, dtype=np.float32)
         brillo_medio = float(arr.mean())
-
-        if brillo_medio < 65.0:
-            gamma = 0.60 if brillo_medio < 38.0 else 0.72
+        if brillo_medio < 62.0:
+            gamma = 0.62 if brillo_medio < 38.0 else 0.74
             arr_norm = np.clip(arr / 255.0, 0.0, 1.0)
             arr_gamma = np.power(arr_norm, gamma) * 255.0
-            img_clara = Image.fromarray(np.clip(arr_gamma, 0, 255).astype(np.uint8))
-            img_clara = ImageEnhance.Contrast(img_clara).enhance(1.14)
-            img_clara.save(ruta, quality=95)
+            img = Image.fromarray(np.clip(arr_gamma, 0, 255).astype(np.uint8))
+            img = ImageEnhance.Contrast(img).enhance(1.12)
+
+        img.save(ruta, quality=95)
     except Exception:
         pass
 
 
 def _evaluar_calidad_candidato(ruta: str) -> tuple:
-    """
-    Control de Calidad Automático (QA):
-    Devuelve (es_valida: bool, puntuacion: float).
-    Rechaza SIEMPRE imágenes con palabras o matrículas detectadas por OCR (NUNCA ignora el OCR).
-    Puntúa mejor las imágenes con buen contraste y exposición equilibrada.
-    """
     try:
         import pytesseract
         import numpy as np
@@ -216,12 +224,10 @@ def _evaluar_calidad_candidato(ruta: str) -> tuple:
                 palabras_basura.append(solo_alfanum)
 
         if len(palabras_basura) >= 1:
-            print(f"  ⚠️ [QA/OCR] Candidato descartado por texto en imagen ({palabras_basura[:2]}).")
+            print(f"  ⚠️ [QA/OCR] Descartado por texto detectado ({palabras_basura[:2]}).")
             return (False, 0.0)
 
-        # Puntuación por riqueza visual (contraste y exposición sana entre 55 y 170)
-        penalizacion_brillo = abs(brillo - 105.0) * 0.4
-        puntuacion = contraste - penalizacion_brillo
+        puntuacion = contraste - abs(brillo - 100.0) * 0.4
         return (True, puntuacion)
     except Exception:
         return (True, 50.0)
@@ -243,7 +249,9 @@ def _descargar_candidato_cf(prompt_completo: str, ruta_destino: str) -> bool:
             if b64_img:
                 with open(ruta_destino, "wb") as f:
                     f.write(base64.b64decode(b64_img))
-                return _validar_imagen(ruta_destino)
+                if _validar_imagen(ruta_destino):
+                    _recortar_marca_agua_y_exponer(ruta_destino, recortar_borde_inferior=False)
+                    return True
         if resp.status_code == 429:
             _cloudflare_agotado[0] = True
     except requests.RequestException:
@@ -260,31 +268,10 @@ def _descargar_candidato_pol(prompt_completo: str, ruta_destino: str, semilla: i
         if resp.status_code == 200:
             with open(ruta_destino, "wb") as f:
                 f.write(resp.content)
-            return _validar_imagen(ruta_destino)
-    except Exception:
-        pass
-    return False
-
-
-def _reciclar_imagen_limpia(ruta_salida: str) -> bool:
-    try:
-        from PIL import Image, ImageOps
-        carpeta = os.path.dirname(os.path.abspath(ruta_salida))
-        candidatas = [
-            os.path.join(carpeta, f)
-            for f in os.listdir(carpeta)
-            if f.startswith("escena_") and f.endswith(".png")
-            and os.path.abspath(os.path.join(carpeta, f)) != os.path.abspath(ruta_salida)
-            and os.path.getsize(os.path.join(carpeta, f)) > TAMANO_MINIMO_BYTES
-        ]
-        if candidatas:
-            origen = random.choice(candidatas)
-            img = Image.open(origen).convert("RGB")
-            img = ImageOps.mirror(img)
-            w, h = img.size
-            img = img.crop((int(w * 0.07), int(h * 0.07), int(w * 0.93), int(h * 0.93))).resize((w, h), Image.Resampling.LANCZOS)
-            img.save(ruta_salida, quality=95)
-            return True
+            if _validar_imagen(ruta_destino):
+                # Recorta siempre el borde inferior de Pollinations para eliminar el logo 'pollinations.ai'
+                _recortar_marca_agua_y_exponer(ruta_destino, recortar_borde_inferior=True)
+                return True
     except Exception:
         pass
     return False
@@ -298,16 +285,16 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) ->
     os.makedirs(os.path.dirname(os.path.abspath(ruta_salida)), exist_ok=True)
     _ultima_fue_emergencia[0] = False
 
-    # 1. Si la escena es una Infografía de Datos Reales, renderizarla con código (Matplotlib)
+    # 1. Si es una de las 4 infografías de datos reales, renderizarla con código y márgenes seguros
     if prompt_escena.startswith("INFOGRAFIA:"):
         if _generar_infografia_codigo(prompt_escena, ruta_salida):
             return True
 
-    sujeto = _enriquecer_prompt_sin_machacar(prompt_escena)
+    sujeto = _sanitizar_prompt_estricto(prompt_escena)
     prompt_completo = f"{sujeto}, {ESTILO_BASE}"
     seed_base = semilla if semilla is not None else abs(hash(prompt_escena)) % 10000
 
-    # 2. Generar hasta 2 candidatos limpios y elegir el de mayor puntuación QA (CERO ignorar_ocr)
+    # 2. Evaluar candidatos limpios (PROHIBIDO usar ImageOps.mirror ni reciclar infografías)
     mejores_candidatos = []
     for i in range(4):
         ruta_cand = f"{ruta_salida}_cand_{i}.png"
@@ -315,10 +302,9 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) ->
         if i < 2:
             descargado = _descargar_candidato_cf(prompt_completo, ruta_cand)
         if not descargado:
-            descargado = _descargar_candidato_pol(prompt_completo, ruta_cand, seed_base + i * 53)
+            descargado = _descargar_candidato_pol(prompt_completo, ruta_cand, seed_base + i * 71)
 
         if descargado:
-            _corregir_exposicion_oscura(ruta_cand)
             es_valida, score = _evaluar_calidad_candidato(ruta_cand)
             if es_valida:
                 mejores_candidatos.append((score, ruta_cand))
@@ -338,8 +324,12 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None) ->
                 os.remove(r_temp)
         return True
 
-    # 3. Si todos los candidatos tuvieron texto inventado, reciclar toma limpia o usar infografía técnica
-    if _reciclar_imagen_limpia(ruta_salida):
+    # 3. Si los 4 candidatos tenían texto, pedir un plano limpio de nubes/océano sin letras (NUNCA espejo)
+    prompt_ultra_limpio = (
+        "Wide shot of dark storm clouds and lightning over the ocean at night seen from an airplane wing, "
+        "photorealistic, 8k, completely empty sky and water, no text, no objects"
+    )
+    if _descargar_candidato_pol(prompt_ultra_limpio, ruta_salida, seed_base + 999):
         return True
     return _generar_infografia_codigo("INFOGRAFIA:CRONOLOGIA", ruta_salida)
 
