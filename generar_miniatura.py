@@ -1,5 +1,6 @@
 import os
 import urllib.request
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps, ImageEnhance
 
 ANCHO, ALTO = 1280, 720
@@ -30,22 +31,37 @@ def _obtener_fuente(tamano: int) -> ImageFont.FreeTypeFont:
     return ImageFont.load_default()
 
 
-def _encuadrar_y_realzar_protagonista(imagen: Image.Image) -> Image.Image:
+def _encuadrar_y_proteger_altas_luces(imagen: Image.Image) -> Image.Image:
+    """
+    Evita quemar la esquina superior izquierda (compresión de altas luces > 210)
+    y aplica un degradado superior e inferior para dar contraste cinematográfico.
+    """
     lienzo = ImageOps.fit(imagen, (ANCHO, ALTO), method=Image.Resampling.LANCZOS)
-    # Recuperar azul intenso, brillo y alto contraste estilo miniatura 9/10 para máximo CTR en móviles
-    lienzo = ImageEnhance.Brightness(lienzo).enhance(1.24)
-    lienzo = ImageEnhance.Contrast(lienzo).enhance(1.22)
-    lienzo = ImageEnhance.Color(lienzo).enhance(1.14)
-    lienzo = lienzo.filter(ImageFilter.UnsharpMask(radius=2.0, percent=140, threshold=3))
+
+    # Comprimir altas luces para que el cielo o el rayo nunca queden blancos quemados
+    arr = np.array(lienzo, dtype=np.float32) / 255.0
+    arr = np.where(arr > 0.78, 0.78 + (arr - 0.78) * 0.45, arr)
+    lienzo = Image.fromarray(np.clip(arr * 255.0, 0, 255).astype(np.uint8))
+
+    lienzo = ImageEnhance.Contrast(lienzo).enhance(1.14)
+    lienzo = ImageEnhance.Color(lienzo).enhance(0.96)
+    lienzo = lienzo.filter(ImageFilter.UnsharpMask(radius=1.8, percent=125, threshold=3))
     base = lienzo.convert("RGBA")
 
     capa_oscura = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
     draw = ImageDraw.Draw(capa_oscura)
 
-    inicio_y = 530
+    # Sutil viñeta superior para recuperar detalle en el cielo/rayo
+    for y in range(0, 140):
+        progreso = 1.0 - (y / 140.0)
+        alpha = int(95 * (progreso ** 1.5))
+        draw.line([(0, y), (ANCHO, y)], fill=(5, 10, 22, alpha))
+
+    # Degradado inferior para el título
+    inicio_y = 500
     for y in range(inicio_y, ALTO):
         progreso = (y - inicio_y) / (ALTO - inicio_y)
-        alpha = int(190 * (progreso ** 1.6))
+        alpha = int(205 * (progreso ** 1.5))
         draw.line([(0, y), (ANCHO, y)], fill=(0, 0, 0, alpha))
 
     return Image.alpha_composite(base, capa_oscura)
@@ -70,14 +86,14 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
     os.makedirs(os.path.dirname(os.path.abspath(ruta_salida)), exist_ok=True)
 
     img_original = Image.open(ruta_imagen_base).convert("RGB")
-    lienzo = _encuadrar_y_realzar_protagonista(img_original)
+    lienzo = _encuadrar_y_proteger_altas_luces(img_original)
 
     texto_limpio = titulo_corto[:32].upper().replace("\\", "").replace(":", "").replace("'", "").replace('"', "").strip()
     if not texto_limpio or "PITOT" in texto_limpio or "FALLO FATAL" in texto_limpio:
         texto_limpio = "LA CINTA MORTAL"
     palabras = texto_limpio.split()
 
-    tamano_fuente = 134
+    tamano_fuente = 136
     margen_maximo = 1120
     dummy_draw = ImageDraw.Draw(lienzo)
 
@@ -93,7 +109,7 @@ def generar_miniatura_desde_imagen(ruta_imagen_base: str, titulo_corto: str, rut
     bbox_ref = dummy_draw.textbbox((0, 0), texto_limpio, font=fuente)
     alto_texto = bbox_ref[3] - bbox_ref[1]
     x_inicial = (ANCHO - ancho_total) // 2
-    y_pos = ALTO - alto_texto - 42 - bbox_ref[1]
+    y_pos = ALTO - alto_texto - 46 - bbox_ref[1]
 
     capa_sombra_amplia = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
     draw_sombra_amplia = ImageDraw.Draw(capa_sombra_amplia)
