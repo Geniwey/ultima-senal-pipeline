@@ -2,31 +2,38 @@ import os
 import sys
 import time
 import base64
+import shutil
 import requests
 import urllib.parse
 import re
 
 ESTILO_BASE = (
-    "cinematic documentary photography, photorealistic, high detail, sharp focus, "
-    "completely blank unmarked smooth surfaces, NO PEOPLE, NO FACES, "
-    "ABSOLUTELY NO TEXT, NO LETTERS, NO NUMBERS, NO SERIAL NUMBERS, NO LOGOS, NO WATERMARKS"
+    "cinematic documentary photography, photorealistic, sharp focus, "
+    "smooth unmarked metallic surfaces, dramatic moody lighting, 8k"
 )
 
-TIMEOUT = 35
+TIMEOUT = 40
 TAMANO_MINIMO_BYTES = 12_000
 _cloudflare_agotado = [False]
 _ultima_fue_emergencia = [False]
 _hashes_usados = []
+_aprobadas_por_plano = {}
+_todas_aprobadas = []
+_stats = {"generadas_ia": 0, "rechazadas_qa": 0, "reutilizadas_banco": 0, "infografias": 0}
 
 
 def fue_ultima_generacion_emergencia() -> bool:
     return _ultima_fue_emergencia[0]
 
 
+def obtener_estadisticas_imagenes() -> dict:
+    return dict(_stats)
+
+
 def _generar_infografia_codigo(tipo: str, ruta_salida: str) -> bool:
     """
-    Biblioteca de 8 infografías y tarjetas de telemetría 1920x1080 renderizadas por código.
-    Márgenes seguros para no solapar jamás el rótulo inferior ni cortarse por los bordes.
+    Biblioteca de 6 infografías 1920x1080 renderizadas por código con márgenes seguros (>6%)
+    y fuentes grandes (>=28px equiv) sin ningún texto cortado ni solapado.
     """
     try:
         import matplotlib
@@ -43,19 +50,19 @@ def _generar_infografia_codigo(tipo: str, ruta_salida: str) -> bool:
 
         if "TARJETA_VUELO" in tipo:
             ax.axis("off")
-            ax.set_title("EXPEDIENTE TÉCNICO: VUELO AEROPERÚ 603", color="#00E5FF", fontsize=25, fontweight="bold", pad=20)
+            ax.set_title("EXPEDIENTE TÉCNICO: VUELO AEROPERÚ 603", color="#00E5FF", fontsize=26, fontweight="bold", pad=22)
             tarjetas = [
-                (0.20, "AERONAVE", "BOEING 757-200\nMatrícula N52AW", "#00E5FF"),
+                (0.19, "AERONAVE", "BOEING 757-200\nMatrícula N52AW", "#00E5FF"),
                 (0.50, "OCUPANTES", "70 PERSONAS\n61 Pasajeros · 9 Tripulantes", "#FFAA00"),
-                (0.80, "RUTA Y FECHA", "LIMA → SANTIAGO\n2 de Octubre de 1996", "#FF3333"),
+                (0.81, "RUTA Y FECHA", "LIMA → SANTIAGO\n2 de Octubre de 1996", "#FF3333"),
             ]
             for x, tit, val, col in tarjetas:
-                bbox = dict(boxstyle="round,pad=0.8", facecolor="#101C2E", edgecolor=col, linewidth=4)
-                ax.text(x, 0.56, f"{tit}\n\n{val}", color="#FFFFFF", fontsize=20, fontweight="bold", ha="center", va="center", bbox=bbox, transform=ax.transAxes)
+                bbox = dict(boxstyle="round,pad=0.75", facecolor="#101C2E", edgecolor=col, linewidth=4)
+                ax.text(x, 0.56, f"{tit}\n\n{val}", color="#FFFFFF", fontsize=19, fontweight="bold", ha="center", va="center", bbox=bbox, transform=ax.transAxes)
 
         elif "ESQUEMA_SENSORES" in tipo:
             ax.axis("off")
-            ax.set_title("INFORME FORENSE: CÓMO LA CINTA ENGAÑÓ AL AVIÓN", color="#FFFFFF", fontsize=25, fontweight="bold", pad=20)
+            ax.set_title("INFORME FORENSE: CÓMO LA CINTA ENGAÑÓ AL AVIÓN", color="#FFFFFF", fontsize=26, fontweight="bold", pad=22)
             bloques = [
                 (0.19, "1. SENSOR TAPADO\nCON CINTA", "Bloquea la presión\natmosférica real", "#FF3333"),
                 (0.50, "2. COMPUTADORA\nCONGELADA", "Calcula una altitud\nfalsa de 9700 pies", "#FFAA00"),
@@ -63,9 +70,9 @@ def _generar_infografia_codigo(tipo: str, ruta_salida: str) -> bool:
             ]
             for x, tit, desc, col in bloques:
                 bbox = dict(boxstyle="round,pad=0.7", facecolor="#101C2E", edgecolor=col, linewidth=4)
-                ax.text(x, 0.55, f"{tit}\n\n{desc}", color="#FFFFFF", fontsize=18, fontweight="bold", ha="center", va="center", bbox=bbox, transform=ax.transAxes)
-            ax.annotate("", xy=(0.35, 0.55), xytext=(0.32, 0.55), arrowprops=dict(facecolor="#FFFFFF", width=4), transform=ax.transAxes)
-            ax.annotate("", xy=(0.66, 0.55), xytext=(0.63, 0.55), arrowprops=dict(facecolor="#FFFFFF", width=4), transform=ax.transAxes)
+                ax.text(x, 0.56, f"{tit}\n\n{desc}", color="#FFFFFF", fontsize=18, fontweight="bold", ha="center", va="center", bbox=bbox, transform=ax.transAxes)
+            ax.annotate("", xy=(0.355, 0.56), xytext=(0.315, 0.56), arrowprops=dict(facecolor="#FFFFFF", width=4), transform=ax.transAxes)
+            ax.annotate("", xy=(0.665, 0.56), xytext=(0.625, 0.56), arrowprops=dict(facecolor="#FFFFFF", width=4), transform=ax.transAxes)
 
         elif "MAPA_RUTA" in tipo:
             costa_x = [-77.05, -77.12, -77.16, -77.22, -77.27, -77.32]
@@ -75,32 +82,32 @@ def _generar_infografia_codigo(tipo: str, ruta_salida: str) -> bool:
             ruta_x = [-77.11, -77.28, -77.42, -77.36, -77.25]
             ruta_y = [-12.02, -12.08, -11.92, -11.76, -11.65]
             ax.plot(ruta_x, ruta_y, color="#00E5FF", linewidth=5.5, label="TRAYECTORIA VUELO 603")
-            ax.scatter([-77.11], [-12.02], color="#00FF88", s=240, zorder=5)
-            ax.text(-77.08, -12.04, "1. DESPEGUE LIMA (00:40 AM)", color="#00FF88", fontweight="bold", fontsize=17)
+            ax.scatter([-77.11], [-12.02], color="#00FF88", s=250, zorder=5)
+            ax.text(-77.08, -12.04, "1. DESPEGUE LIMA (00:40 AM)", color="#00FF88", fontweight="bold", fontsize=18)
             ax.scatter([-77.25], [-11.65], color="#FF2222", s=300, marker="X", zorder=6)
-            ax.text(-77.22, -11.66, "2. IMPACTO EN EL MAR (01:11 AM)", color="#FF4444", fontweight="bold", fontsize=17)
-            ax.set_title("TRAYECTORIA RADAR: SALIDA DE LIMA Y GIRO AL PACÍFICO", color="#FFFFFF", fontsize=24, fontweight="bold", pad=22)
-            ax.set_xlabel("LONGITUD OESTE", color="#B0C4DE", fontsize=16, fontweight="bold")
-            ax.set_ylabel("LATITUD SUR", color="#B0C4DE", fontsize=16, fontweight="bold")
+            ax.text(-77.22, -11.66, "2. IMPACTO EN EL MAR (01:11 AM)", color="#FF4444", fontweight="bold", fontsize=18)
+            ax.set_title("TRAYECTORIA RADAR: SALIDA DE LIMA Y GIRO AL PACÍFICO", color="#FFFFFF", fontsize=25, fontweight="bold", pad=22)
+            ax.set_xlabel("LONGITUD OESTE", color="#B0C4DE", fontsize=17, fontweight="bold")
+            ax.set_ylabel("LATITUD SUR", color="#B0C4DE", fontsize=17, fontweight="bold")
             ax.set_xlim(-77.52, -76.88)
             ax.set_ylim(-12.18, -11.48)
             ax.grid(True, color="#1C2D42", linestyle="--", linewidth=1.2)
-            ax.tick_params(colors="#FFFFFF", labelsize=14)
+            ax.tick_params(colors="#FFFFFF", labelsize=15)
             leg = ax.legend(loc="lower left", facecolor="#070B12", edgecolor="#2A3F5F", fontsize=16)
             for t in leg.get_texts():
                 t.set_color("#FFFFFF")
 
         elif "PANEL_ALARMAS" in tipo:
             ax.axis("off")
-            ax.set_title("CABINA DE MANDO: CONFLICTO DE ALERTAS SIMULTÁNEAS", color="#FFAA00", fontsize=25, fontweight="bold", pad=20)
+            ax.set_title("CABINA DE MANDO: CONFLICTO DE ALERTAS SIMULTÁNEAS", color="#FFAA00", fontsize=26, fontweight="bold", pad=22)
             paneles = [
-                (0.28, "ALARMA DE PÉRDIDA\n(STICK SHAKER)", "Indica velocidad\ndemasiado BAJA", "#FF3333"),
-                (0.72, "ALARMA EXCESO VELOCIDAD\n(OVERSPEED)", "Indica velocidad\ndemasiado ALTA", "#00E5FF"),
+                (0.27, "ALARMA DE PÉRDIDA\n(STICK SHAKER)", "Indica velocidad\ndemasiado BAJA", "#FF3333"),
+                (0.73, "ALARMA EXCESO VELOCIDAD\n(OVERSPEED)", "Indica velocidad\ndemasiado ALTA", "#00E5FF"),
             ]
             for x, tit, desc, col in paneles:
                 bbox = dict(boxstyle="round,pad=0.8", facecolor="#101C2E", edgecolor=col, linewidth=4)
                 ax.text(x, 0.56, f"{tit}\n\n{desc}", color="#FFFFFF", fontsize=20, fontweight="bold", ha="center", va="center", bbox=bbox, transform=ax.transAxes)
-            ax.text(0.50, 0.56, "VS", color="#FFAA00", fontsize=30, fontweight="bold", ha="center", va="center", transform=ax.transAxes)
+            ax.text(0.50, 0.56, "VS", color="#FFAA00", fontsize=32, fontweight="bold", ha="center", va="center", transform=ax.transAxes)
 
         elif "GRAFICA_ALTITUD" in tipo:
             minutos = np.linspace(0, 31, 200)
@@ -119,7 +126,7 @@ def _generar_infografia_codigo(tipo: str, ruta_salida: str) -> bool:
             ax.fill_between(minutos, alt_real, 0, color="#FF2A2A", alpha=0.18)
             ax.scatter([31], [0], color="#FFFFFF", s=240, zorder=5)
             ax.annotate("01:11 AM - IMPACTO (0 PIES)", xy=(30.8, 200), xytext=(16.5, 2600), color="#FFFFFF", fontweight="bold", fontsize=18, arrowprops=dict(facecolor="#FF2A2A", shrink=0.08, width=3))
-            ax.set_title("DATOS CAJA NEGRA (FDR): ALTITUD FALSA VS REAL", color="#FFFFFF", fontsize=24, fontweight="bold", pad=22)
+            ax.set_title("DATOS CAJA NEGRA (FDR): ALTITUD FALSA VS REAL", color="#FFFFFF", fontsize=25, fontweight="bold", pad=22)
             ax.set_xlabel("MINUTOS DE VUELO DESDE LIMA", color="#B0C4DE", fontsize=17, fontweight="bold", labelpad=12)
             ax.set_ylabel("ALTITUD (PIES)", color="#B0C4DE", fontsize=17, fontweight="bold", labelpad=12)
             ax.set_ylim(-600, 12200)
@@ -130,19 +137,7 @@ def _generar_infografia_codigo(tipo: str, ruta_salida: str) -> bool:
             for t in leg.get_texts():
                 t.set_color("#FFFFFF")
 
-        elif "PERFIL_IMPACTO" in tipo:
-            ax.axis("off")
-            ax.set_title("ÚLTIMOS 60 SEGUNDOS: EL ENGAÑO DEL ALTÍMETRO", color="#FF3333", fontsize=25, fontweight="bold", pad=20)
-            datos_impacto = [
-                (0.22, "ALTITUD EN PANTALLA", "9.700 PIES", "Los pilotos creían tener margen seguro", "#FFAA00"),
-                (0.50, "ALTITUD REAL", "0 PIES", "El ala izquierda tocó las olas a oscuras", "#FF3333"),
-                (0.78, "TIEMPO TOTAL", "31 MINUTOS", "Desde el despegue hasta el impacto", "#00E5FF"),
-            ]
-            for x, tit, cifra, sub, col in datos_impacto:
-                bbox = dict(boxstyle="round,pad=0.8", facecolor="#101C2E", edgecolor=col, linewidth=4)
-                ax.text(x, 0.56, f"{tit}\n\n{cifra}\n\n{sub}", color="#FFFFFF", fontsize=18, fontweight="bold", ha="center", va="center", bbox=bbox, transform=ax.transAxes)
-
-        elif "CRONOLOGIA" in tipo:
+        else:  # CRONOLOGIA (usada 1 sola vez)
             ax.axis("off")
             ax.set_title("CRONOLOGÍA OFICIAL (INFORME CIAA - 2 OCT 1996)", color="#FFFFFF", fontsize=25, fontweight="bold", pad=20)
             hitos = [
@@ -159,22 +154,11 @@ def _generar_infografia_codigo(tipo: str, ruta_salida: str) -> bool:
                 ax.scatter([0.20], [y], color=color_punto, s=260, zorder=5, transform=ax.transAxes)
                 ax.text(0.04, y, hora, color="#00E5FF", fontsize=20, fontweight="bold", va="center", transform=ax.transAxes)
                 ax.text(0.24, y + 0.025, titulo, color="#FFFFFF", fontsize=20, fontweight="bold", va="center", transform=ax.transAxes)
-                ax.text(0.24, y - 0.035, detalle, color="#C0D4EE", fontsize=16, va="center", transform=ax.transAxes)
-
-        else:  # CAMBIOS_NORMATIVA
-            ax.axis("off")
-            ax.set_title("CAMBIOS OBLIGATORIOS TRAS EL ACCIDENTE (OACI)", color="#00FF88", fontsize=25, fontweight="bold", pad=20)
-            medidas = [
-                (0.20, "1. CINTAS DE ALTA\nVISIBILIDAD", "Prohibido usar cinta\nplateada camuflada", "#00FF88"),
-                (0.50, "2. BANDERINES\nCOLGANTES", "Señalización física\nvisible desde tierra", "#00E5FF"),
-                (0.80, "3. DOBLE FIRMA\nDE INSPECCIÓN", "Verificación cruzada\nantes de cada vuelo", "#FFAA00"),
-            ]
-            for x, tit, desc, col in medidas:
-                bbox = dict(boxstyle="round,pad=0.8", facecolor="#101C2E", edgecolor=col, linewidth=4)
-                ax.text(x, 0.56, f"{tit}\n\n{desc}", color="#FFFFFF", fontsize=18, fontweight="bold", ha="center", va="center", bbox=bbox, transform=ax.transAxes)
+                ax.text(0.24, y - 0.035, detalle, color="#C0D4EE", fontsize=17, va="center", transform=ax.transAxes)
 
         fig.savefig(ruta_salida, facecolor=fig.get_facecolor(), edgecolor="none")
         plt.close(fig)
+        _stats["infografias"] += 1
         print(f"  📊 [Infografía 1080p] Generada: {tipo}")
         return _validar_imagen(ruta_salida)
     except Exception as e:
@@ -190,19 +174,22 @@ def _validar_imagen(ruta: str) -> bool:
         return cabecera.startswith(b"\x89PNG") or cabecera.startswith(b"\xff\xd8\xff")
 
 
-def _recortar_marca_agua_y_exponer(ruta: str, recortar_borde: bool = False):
+def _recortar_y_normalizar_16_9(ruta: str, recortar_watermark: bool = False):
     try:
         import numpy as np
-        from PIL import Image, ImageEnhance
+        from PIL import Image, ImageEnhance, ImageOps
+
         img = Image.open(ruta).convert("RGB")
-        w, h = img.size
-        if recortar_borde:
-            img = img.crop((int(w * 0.03), int(h * 0.03), int(w * 0.94), int(h * 0.92))).resize((1920, 1080), Image.Resampling.LANCZOS)
+        if recortar_watermark:
+            w, h = img.size
+            img = img.crop((int(w * 0.02), int(h * 0.02), int(w * 0.95), int(h * 0.93)))
+        img = ImageOps.fit(img, (1920, 1080), method=Image.Resampling.LANCZOS)
+
         arr = np.array(img, dtype=np.float32)
-        if float(arr.mean()) < 58.0:
-            gamma = 0.65 if float(arr.mean()) < 36.0 else 0.76
+        if float(arr.mean()) < 52.0:
+            gamma = 0.68 if float(arr.mean()) < 32.0 else 0.78
             img = Image.fromarray(np.clip(np.power(np.clip(arr / 255.0, 0.0, 1.0), gamma) * 255.0, 0, 255).astype(np.uint8))
-            img = ImageEnhance.Contrast(img).enhance(1.12)
+            img = ImageEnhance.Contrast(img).enhance(1.10)
         img.save(ruta, quality=95)
     except Exception:
         pass
@@ -222,23 +209,22 @@ def _calcular_dhash(img_rgb) -> int:
 
 def _es_duplicada(dhash_val: int) -> bool:
     for h in _hashes_usados:
-        if bin(dhash_val ^ h).count("1") <= 6:
+        if bin(dhash_val ^ h).count("1") <= 5:
             return True
     return False
 
 
-def _evaluar_puerta_calidad(ruta: str, permitir_duplicado: bool = False) -> tuple:
+def _evaluar_puerta_calidad(ruta: str, permitir_duplicado: bool = False, es_miniatura: bool = False) -> tuple:
     """
-    Puerta de calidad en código:
-    1. Rechaza imágenes vacías/abstractas (contraste < 28 o nitidez < 30).
-    2. Rechaza imágenes quemadas en blanco (> 6% píxeles > 245).
-    3. Rechaza texto/grabados basura mediante OCR de doble contraste (--psm 11).
-    4. Rechaza duplicados mediante hash perceptual.
+    Puerta de calidad calibrada para fotografía nocturna documental:
+    - Rechaza pantallas negras (<15), quemadas (>205) o planas sin detalle (std < 18).
+    - Rechaza texto basura detectado por OCR con confianza >= 60.
+    - Rechaza duplicados por hash perceptual.
     """
     try:
         import numpy as np
         import pytesseract
-        from PIL import Image, ImageEnhance, ImageFilter
+        from PIL import Image, ImageFilter
 
         img_rgb = Image.open(ruta).convert("RGB")
         arr = np.array(img_rgb, dtype=np.float32)
@@ -247,61 +233,65 @@ def _evaluar_puerta_calidad(ruta: str, permitir_duplicado: bool = False) -> tupl
         contraste = float(arr.std())
         pct_quemado = float((arr.mean(axis=2) > 245).mean())
 
-        if contraste < 28.0 or brillo < 22.0 or pct_quemado > 0.06:
-            print(f"  ⚠️ [Puerta Calidad] Rechazada por imagen vacía/quemada (std={contraste:.1f}, quemado={pct_quemado:.2f}).")
-            return (False, 0.0)
+        if brillo < 15.0 or brillo > 205.0 or contraste < 18.0:
+            return (False, f"brillo/contraste fuera de rango (brillo={brillo:.1f}, std={contraste:.1f})")
 
-        # Medir nitidez/estructura para matar círculos borrosos vacíos
+        if es_miniatura and pct_quemado > 0.06:
+            return (False, f"zona quemada en miniatura ({pct_quemado:.2f})")
+
         bordes = np.array(img_rgb.convert("L").filter(ImageFilter.FIND_EDGES), dtype=np.float32)
         nitidez = float(bordes.std())
-        if nitidez < 18.0:
-            print(f"  ⚠️ [Puerta Calidad] Rechazada por falta de detalle/sujeto (nitidez={nitidez:.1f}).")
-            return (False, 0.0)
+        if nitidez < 7.5:
+            return (False, f"imagen vacía/borrosa (nitidez={nitidez:.1f})")
 
-        # OCR de doble pasada para cazar textos grabados en metal o cinta ("Reolscort", "N0770210", "STU GOINNE")
-        img_gris = img_rgb.convert("L")
-        for version in (img_gris, ImageEnhance.Contrast(img_gris).enhance(2.4)):
-            datos = pytesseract.image_to_data(version, config="--psm 11", output_type=pytesseract.Output.DICT)
-            for i, txt in enumerate(datos["text"]):
-                limpio = re.sub(r"[^A-Za-z0-9]", "", txt.strip())
-                conf = int(datos["conf"][i]) if str(datos["conf"][i]).lstrip("-").isdigit() else 0
-                if len(limpio) >= 3 and conf > 40:
-                    print(f"  ⚠️ [Puerta OCR] Rechazada por texto detectado: '{limpio}' (conf={conf}).")
-                    return (False, 0.0)
+        peq = img_rgb.resize((1024, 576), Image.Resampling.LANCZOS)
+        datos = pytesseract.image_to_data(peq, config="--psm 11", output_type=pytesseract.Output.DICT)
+        for txt, conf in zip(datos["text"], datos["conf"]):
+            letras = re.sub(r"[^A-Za-z]", "", txt.strip())
+            c_val = float(conf) if str(conf).lstrip("-").isdigit() else 0.0
+            if len(letras) >= 3 and c_val >= 60.0:
+                return (False, f"texto detectado por OCR: '{txt}'")
 
         dhash_val = _calcular_dhash(img_rgb)
         if not permitir_duplicado and _es_duplicada(dhash_val):
-            print("  ⚠️ [Puerta Duplicados] Rechazada por similitud visual excesiva.")
-            return (False, 0.0)
+            return (False, "imagen demasiado similar a otra anterior")
 
-        score = contraste + nitidez - pct_quemado * 200.0
+        score = contraste + nitidez - pct_quemado * 150.0
         return (True, score)
     except Exception:
         return (True, 50.0)
 
 
-def _descargar_candidato_cf(prompt_completo: str, ruta_destino: str) -> bool:
+def _descargar_candidato_cf(prompt_completo: str, ruta_destino: str, modelo_cf: str = "@cf/black-forest-labs/flux-1-schnell") -> bool:
     if _cloudflare_agotado[0]:
         return False
     account_id = os.environ.get("CF_ACCOUNT_ID")
     api_token = os.environ.get("CF_API_TOKEN")
     if not account_id or not api_token:
         return False
-    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/black-forest-labs/flux-1-schnell"
+    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{modelo_cf}"
     try:
-        resp = requests.post(url, headers={"Authorization": f"Bearer {api_token}"}, json={"prompt": prompt_completo, "steps": 8}, timeout=TIMEOUT)
+        payload = {"prompt": prompt_completo, "steps": 8} if "flux" in modelo_cf else {"prompt": prompt_completo}
+        resp = requests.post(url, headers={"Authorization": f"Bearer {api_token}"}, json=payload, timeout=TIMEOUT)
         if resp.status_code == 200:
-            b64 = resp.json().get("result", {}).get("image")
-            if b64:
+            ctype = resp.headers.get("Content-Type", "")
+            if "application/json" in ctype:
+                b64 = resp.json().get("result", {}).get("image")
+                if b64:
+                    with open(ruta_destino, "wb") as f:
+                        f.write(base64.b64decode(b64))
+            else:
                 with open(ruta_destino, "wb") as f:
-                    f.write(base64.b64decode(b64))
-                if _validar_imagen(ruta_destino):
-                    _recortar_marca_agua_y_exponer(ruta_destino, False)
-                    return True
-        if resp.status_code == 429:
-            _cloudflare_agotado[0] = True
-    except Exception:
-        pass
+                    f.write(resp.content)
+            if _validar_imagen(ruta_destino):
+                _recortar_y_normalizar_16_9(ruta_destino, recortar_watermark=False)
+                return True
+        else:
+            print(f"  [API Cloudflare {modelo_cf}] HTTP {resp.status_code}")
+            if resp.status_code == 429:
+                _cloudflare_agotado[0] = True
+    except Exception as e:
+        print(f"  [API Cloudflare {modelo_cf}] Error: {e}")
     return False
 
 
@@ -313,64 +303,97 @@ def _descargar_candidato_pol(prompt_completo: str, ruta_destino: str, semilla: i
             with open(ruta_destino, "wb") as f:
                 f.write(resp.content)
             if _validar_imagen(ruta_destino):
-                _recortar_marca_agua_y_exponer(ruta_destino, True)
+                _recortar_y_normalizar_16_9(ruta_destino, recortar_watermark=True)
                 return True
-    except Exception:
-        pass
+        else:
+            print(f"  [API Pollinations] HTTP {resp.status_code}")
+    except Exception as e:
+        print(f"  [API Pollinations] Error: {e}")
     return False
 
 
-def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None, es_miniatura: bool = False) -> bool:
+def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None, es_miniatura: bool = False, plano: str = "general") -> bool:
     os.makedirs(os.path.dirname(os.path.abspath(ruta_salida)), exist_ok=True)
     _ultima_fue_emergencia[0] = False
 
+    # 1. Infografías renderizadas por código (solo cuando el plan de escenas pide INFOGRAFIA:)
     if prompt_escena.startswith("INFOGRAFIA:"):
         return _generar_infografia_codigo(prompt_escena, ruta_salida)
 
-    sujeto = re.sub(r"\b(text|words|letters|logo|airsa)\b", "", prompt_escena, flags=re.IGNORECASE).strip()
-    prompt_completo = f"{sujeto}, {ESTILO_BASE}"
+    # Prompt en positivo (sin palabras negativas que confunden a Flux/SDXL)
+    prompt_limpio = re.sub(r"\bno\s+\w+\b", "", prompt_escena, flags=re.IGNORECASE).strip(" ,.")
+    prompt_completo = f"{prompt_limpio}, {ESTILO_BASE}"
     seed_base = semilla if semilla is not None else abs(hash(prompt_escena)) % 10000
 
-    # Evaluar hasta 4 candidatas (3 candidatas obligatorias para miniatura) y elegir la de mayor puntuación
     candidatas_validas = []
-    max_intentos = 5 if es_miniatura else 4
-    objetivo_candidatas = 3 if es_miniatura else 2
+    intentos = [
+        ("cf_flux", 0),
+        ("cf_sdxl", 1),
+        ("pol", seed_base + 11),
+        ("pol", seed_base + 47),
+    ]
+    if es_miniatura:
+        intentos.append(("pol", seed_base + 89))
 
-    for i in range(max_intentos):
-        ruta_cand = f"{ruta_salida}_cand_{i}.png"
-        descargado = _descargar_candidato_cf(prompt_completo, ruta_cand) if i < 2 else _descargar_candidato_pol(prompt_completo, ruta_cand, seed_base + i * 37)
+    objetivo = 3 if es_miniatura else 2
+
+    for idx_int, (proveedor, seed_actual) in enumerate(intentos):
+        ruta_cand = f"{ruta_salida}_cand_{idx_int}.png"
+        if proveedor == "cf_flux":
+            descargado = _descargar_candidato_cf(prompt_completo, ruta_cand, "@cf/black-forest-labs/flux-1-schnell")
+        elif proveedor == "cf_sdxl":
+            descargado = _descargar_candidato_cf(prompt_completo, ruta_cand, "@cf/bytedance/stable-diffusion-xl-lightning")
+        else:
+            time.sleep(2.5)
+            descargado = _descargar_candidato_pol(prompt_completo, ruta_cand, seed_actual)
+
         if descargado:
-            es_valida, score = _evaluar_puerta_calidad(ruta_cand, permitir_duplicado=es_miniatura)
+            es_valida, info_o_score = _evaluar_puerta_calidad(
+                ruta_cand,
+                permitir_duplicado=es_miniatura,
+                es_miniatura=es_miniatura,
+            )
             if es_valida:
-                candidatas_validas.append((score, ruta_cand))
-                if len(candidatas_validas) >= objetivo_candidatas:
+                candidatas_validas.append((info_o_score, ruta_cand))
+                if len(candidatas_validas) >= objetivo:
                     break
             else:
+                _stats["rechazadas_qa"] += 1
+                print(f"  ⚠️ [QA] Candidata descartada: {info_o_score}")
                 if os.path.exists(ruta_cand):
                     os.remove(ruta_cand)
-        time.sleep(0.9)
 
     if candidatas_validas:
         candidatas_validas.sort(key=lambda x: x[0], reverse=True)
         ganadora = candidatas_validas[0][1]
-        if not es_miniatura:
-            try:
-                from PIL import Image
-                _hashes_usados.append(_calcular_dhash(Image.open(ganadora).convert("RGB")))
-            except Exception:
-                pass
         os.replace(ganadora, ruta_salida)
         for _, sobrante in candidatas_validas[1:]:
             if os.path.exists(sobrante):
                 os.remove(sobrante)
+
+        if not es_miniatura:
+            _stats["generadas_ia"] += 1
+            try:
+                from PIL import Image
+                _hashes_usados.append(_calcular_dhash(Image.open(ruta_salida).convert("RGB")))
+            except Exception:
+                pass
+            _aprobadas_por_plano.setdefault(plano, []).append(ruta_salida)
+            _todas_aprobadas.append(ruta_salida)
         return True
 
-    # Fallback limpio garantizado
+    # 2. Respaldo del banco de fotos reales aprobadas (NUNCA una infografía)
     _ultima_fue_emergencia[0] = True
-    prompt_respaldo = "Wide shot of an unmarked commercial airliner flying above dark stormy ocean waves at night under moonlight, sharp detail, no text, no logos"
-    if _descargar_candidato_pol(prompt_respaldo, ruta_salida, seed_base + 999):
+    banco_mismo_plano = _aprobadas_por_plano.get(plano, [])
+    fuente_reutilizar = banco_mismo_plano[0] if banco_mismo_plano else (_todas_aprobadas[0] if _todas_aprobadas else None)
+
+    if fuente_reutilizar and os.path.exists(fuente_reutilizar):
+        shutil.copy2(fuente_reutilizar, ruta_salida)
+        _stats["reutilizadas_banco"] += 1
+        print(f"  🔄 [Banco Planos] Reutilizada toma aprobada de '{plano}' (se animará con distinto zoom).")
         return True
-    return _generar_infografia_codigo("INFOGRAFIA:CRONOLOGIA", ruta_salida)
+
+    return False
 
 
 if __name__ == "__main__":
