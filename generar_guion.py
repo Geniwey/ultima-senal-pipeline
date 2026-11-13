@@ -345,4 +345,4 @@ if __name__ == "__main__":
         sys.exit(1)
     guion = generar_guion(sys.argv[1])
     with open(sys.argv[2], "w", encoding="utf-8") as f:
-        json.dump(guion, f
+        json.dump(guion, f, ensure_ascii=False, indent=2)
