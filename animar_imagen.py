@@ -23,7 +23,6 @@ def animar_imagen(
     num_frames = max(int(duracion_segundos * FPS), FPS)
     filtro_normalizar = f"scale={ANCHO}:{ALTO}:force_original_aspect_ratio=increase,crop={ANCHO}:{ALTO},setsar=1"
 
-    # Las 8 infografías por código quedan 100% fijas para que jamás se corte un borde
     if es_infografia:
         filtros = [filtro_normalizar]
     else:
@@ -42,7 +41,6 @@ def animar_imagen(
         )
         filtros = [filtro_zoompan, "vignette=angle=PI/4.5"]
 
-    # Rótulo inferior dentro de márgenes seguros (90% ancho máx), tamaño fijo legible y sin puntos suspensivos
     if texto_pantalla:
         texto_seguro = (
             texto_pantalla.strip().upper()
@@ -54,12 +52,12 @@ def animar_imagen(
             .replace('"', "")
             .replace("%", "")
         )
-        tamano_letra = 58 if len(texto_seguro) <= 24 else max(46, int(1480 / len(texto_seguro)))
+        tamano_letra = 56 if len(texto_seguro) <= 22 else max(42, int(1440 / len(texto_seguro)))
         filtros.append(
             f"drawtext=text='{texto_seguro}':fontcolor=white:fontsize={tamano_letra}:"
             f"font='DejaVu Sans Bold':borderw=4:bordercolor=black@1.0:"
             f"box=1:boxcolor=black@0.86:boxborderw=20:"
-            f"x=(w-text_w)/2:y=h-text_h-80:"
+            f"x=(w-text_w)/2:y=h-text_h-78:"
             f"alpha='if(lt(t,0.3),t/0.3,1)'"
         )
 
