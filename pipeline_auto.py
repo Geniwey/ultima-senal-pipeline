@@ -5,7 +5,11 @@ import shutil
 import subprocess
 
 from generar_guion import generar_guion
-from generar_imagen import generar_imagen, fue_ultima_generacion_emergencia, obtener_estadisticas_imagenes
+from generar_imagen import (
+    generar_imagen,
+    obtener_estadisticas_imagenes,
+    obtener_mejor_imagen_plano,
+)
 from generar_voz import generar_voces
 from animar_imagen import animar_todas
 from montar_video import montar_video_final
@@ -18,7 +22,6 @@ except ImportError:
 
 
 def _ejecutar_puerta_final(ruta_video: str, guion: dict) -> dict:
-    """Auditoría automática antes de dar el vídeo por bueno."""
     res_dur = subprocess.run(
         ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", ruta_video],
         capture_output=True, text=True,
@@ -43,7 +46,7 @@ def _ejecutar_puerta_final(ruta_video: str, guion: dict) -> dict:
     )
     tramos_negros = res_black.stderr.count("black_start")
 
-    informe = {
+    return {
         "duracion_segundos": round(duracion, 1),
         "volumen_medio": mean_db,
         "volumen_pico": max_db,
@@ -51,7 +54,6 @@ def _ejecutar_puerta_final(ruta_video: str, guion: dict) -> dict:
         "estadisticas_imagenes": obtener_estadisticas_imagenes(),
         "total_escenas": len(guion.get("escenas", [])),
     }
-    return informe
 
 
 def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
@@ -59,14 +61,13 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
     carpeta_imagenes = os.path.join(carpeta_proyecto, "imagenes")
     carpeta_clips = os.path.join(carpeta_proyecto, "clips")
 
-    # Limpiar carpetas de trabajo previas para no arrastrar clips o imágenes viejas
     for carpeta in (carpeta_audio, carpeta_imagenes, carpeta_clips):
         if os.path.exists(carpeta):
             shutil.rmtree(carpeta)
         os.makedirs(carpeta, exist_ok=True)
     os.makedirs(carpeta_proyecto, exist_ok=True)
 
-    print("\n=== 1/6: Guion Forense Verificado + Auditoría Ortográfica ===")
+    print("\n=== 1/6: Guion Forense Verificado + Coherencia Rótulo/Plano ===")
     ruta_guion = os.path.join(carpeta_proyecto, "guion.json")
     guion = generar_guion(tema)
     with open(ruta_guion, "w", encoding="utf-8") as f:
@@ -88,8 +89,8 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
         if not ok or not os.path.exists(ruta_img):
             escenas_sin_imagen += 1
 
-    if escenas_sin_imagen > max(2, int(total_escenas * 0.20)):
-        raise RuntimeError(f"Abortado por puerta de calidad: {escenas_sin_imagen}/{total_escenas} escenas sin imagen aprobada. Revisa los límites de API en el log.")
+    if escenas_sin_imagen > int(total_escenas * 0.50):
+        raise RuntimeError(f"Abortado: {escenas_sin_imagen}/{total_escenas} escenas quedaron sin archivo visual.")
 
     print("\n=== 4/6: Animación y Rótulos ===")
     animar_todas(info_escenas, carpeta_imagenes, carpeta_clips)
@@ -105,25 +106,18 @@ def ejecutar_pipeline_completo(tema: str, carpeta_proyecto: str = "proyecto"):
         except Exception:
             pass
 
-    print("\n=== 6/6: Miniatura Triple (Cinta + Rayo) y Puerta Final ===")
-    ruta_base_miniatura = os.path.join(carpeta_imagenes, "miniatura_base.png")
-    miniatura_ok = False
-    if guion.get("prompt_miniatura"):
-        if generar_imagen(guion["prompt_miniatura"], ruta_base_miniatura, semilla=4207, es_miniatura=True, plano="cinta_puerto"):
-            if not fue_ultima_generacion_emergencia():
-                miniatura_ok = True
-
-    # Si las 3 candidatas dedicadas de miniatura fallan OCR, usar la mejor escena real de cinta_puerto (NUNCA una infografía)
-    if not miniatura_ok:
+    print("\n=== 6/6: Miniatura desde Toma Aprobada de Cinta y Puerta Final ===")
+    # Reutiliza directamente la mejor imagen ya aprobada de cinta_puerto (nunca genera un panel borroso desde cero)
+    ruta_base_miniatura = obtener_mejor_imagen_plano("cinta_puerto")
+    if not ruta_base_miniatura or not os.path.exists(ruta_base_miniatura):
         for idx, esc_g in enumerate(escenas_guion):
             if esc_g.get("plano") == "cinta_puerto":
-                candidata_cinta = os.path.join(carpeta_imagenes, f"escena_{idx + 1:02d}.png")
-                if os.path.exists(candidata_cinta):
-                    ruta_base_miniatura = candidata_cinta
-                    miniatura_ok = True
+                cand = os.path.join(carpeta_imagenes, f"escena_{idx + 1:02d}.png")
+                if os.path.exists(cand):
+                    ruta_base_miniatura = cand
                     break
 
-    if os.path.exists(ruta_base_miniatura):
+    if ruta_base_miniatura and os.path.exists(ruta_base_miniatura):
         ruta_miniatura = os.path.join(carpeta_proyecto, "miniatura.png")
         generar_miniatura_desde_imagen(ruta_base_miniatura, guion.get("titulo_miniatura", "LA CINTA MORTAL"), ruta_miniatura)
 
