@@ -2,6 +2,7 @@ import os
 import json
 import sys
 import re
+from collections import Counter
 from groq import Groq
 
 MODELO_PRINCIPAL = "openai/gpt-oss-120b"
@@ -46,10 +47,30 @@ BANCO_PLANOS = {
     "torre_noche": "Exterior shot of an airport air traffic control tower at night surrounded by dense mist with glowing green radar room windows, moody cinematic lighting",
 }
 
+REGLAS_COHERENCIA = {
+    "IMPACTO": {"mar_tormenta", "ala_nubes"},
+    "OCÉANO": {"mar_tormenta", "barco_rescate"},
+    "MAR": {"mar_tormenta", "barco_rescate"},
+    "PUERTO": {"cinta_puerto"},
+    "SENSOR": {"cinta_puerto"},
+    "CINTA": {"cinta_puerto"},
+    "INSPECCIÓN": {"cinta_puerto", "hangar"},
+    "CAJA NEGRA": {"caja_negra"},
+    "GRABADORA": {"caja_negra"},
+    "TORRE": {"torre_noche"},
+    "RADAR": {"torre_noche"},
+    "DESPEGUE": {"pista_lluvia", "avion_frontal"},
+    "PISTA": {"pista_lluvia"},
+    "TURBINA": {"turbina"},
+    "MOTOR": {"turbina"},
+    "RESCATE": {"barco_rescate"},
+}
+
 PALABRAS_VACIAS = {
     "REFLEXIÓN", "MEMORIAL", "ESTADÍSTICAS", "PREGUNTA", "TECNOLOGÍA",
     "LECCIÓN", "CONCLUSIÓN", "LEGADO", "DECISIÓN", "INTERROGANTE", "ESTUDIO",
     "INFORMACIÓN", "ANÁLISIS", "COMPARTE", "SUSCRÍBETE", "TRAGEDIA",
+    "RESUMEN FINAL", "CASOS SIMILARES", "HONOR LIMA",
 }
 
 CORRECCIONES_ORTOGRAFICAS = {
@@ -59,6 +80,22 @@ CORRECCIONES_ORTOGRAFICAS = {
     r"\bININTERUMPIDA\b": "ININTERRUMPIDA",
     r"\bAEROPERU\b": "AEROPERÚ",
 }
+
+
+def rotulo_coherente(rotulo: str, plano: str) -> bool:
+    rot_up = rotulo.upper()
+    for clave, permitidos in REGLAS_COHERENCIA.items():
+        if clave in rot_up and plano not in permitidos:
+            return False
+    return True
+
+
+def _corregir_plano_por_rotulo(rotulo: str, plano_actual: str) -> str:
+    rot_up = rotulo.upper()
+    for clave, permitidos in REGLAS_COHERENCIA.items():
+        if clave in rot_up and plano_actual not in permitidos:
+            return sorted(permitidos)[0]
+    return plano_actual
 
 
 def _cargar_ficha(tema: str) -> dict:
@@ -83,7 +120,7 @@ def _corregir_ortografia(texto: str) -> str:
 
 def _build_system_prompt(ficha: dict) -> str:
     planos_lista = ", ".join(BANCO_PLANOS.keys())
-    return f"""Eres el director jefe de un canal documental forense de aviación en YouTube. Escribe un guion de exactamente 34 escenas (duración total 4:45 a 5:15 min) con máximo rigor técnico y tono respetuoso con las víctimas.
+    return f"""Eres el director jefe de un canal documental forense de aviación en YouTube. Escribe un guion de exactamente 34 escenas (duración total 4:30 a 5:15 min) con máximo rigor técnico y tono respetuoso con las víctimas.
 
 FICHA DE HECHOS VERIFICADA (USA SOLO ESTOS DATOS; SI UN DATO NO ESTÁ AQUÍ, NO LO INVENTES):
 {json.dumps(ficha, ensure_ascii=False, indent=2)}
@@ -92,15 +129,17 @@ REGLAS OBLIGATORIAS DE ESTRUCTURA Y NARRACIÓN:
 1. GANCHO EN FRÍO (Escenas 1 y 2): Empieza a las 01:10 AM en pleno clímax nocturno sobre el Pacífico con las alarmas sonando antes de rebobinar al despegue en Lima.
 2. RITMO NARRATIVO: Introduce una pregunta o giro técnico cada 5 escenas.
 3. LONGITUD DE NARRACIÓN: Cada "texto_narracion" debe tener entre 14 y 22 palabras claras en español.
-4. CIERRE DOCUMENTAL: Termina en seco con una pregunta técnica reflexiva para comentarios. PROHIBIDO pedir suscripciones, likes o que compartan el vídeo.
+4. ÚLTIMAS 4 ESCENAS: Deben incluir cifras o consecuencias reales de la ficha (ej. "70 VÍCTIMAS EN EL PACÍFICO", "CUBIERTAS CON BANDERÍN OACI", "DOBLE INSPECCIÓN PREVUELO"). PROHIBIDO usar rótulos genéricos como "RESUMEN FINAL", "CASOS SIMILARES" o "HONOR LIMA".
+5. CIERRE DOCUMENTAL: Termina en seco con una pregunta técnica reflexiva para comentarios. PROHIBIDO pedir suscripciones o likes.
 
 REGLAS ESTRICTAS DE RÓTULOS ("texto_pantalla"):
-- Debe estar en MAYÚSCULAS, tener entre 2 y 5 palabras completas (máximo 30 caracteres) y contener un dato concreto (hora, cifra, lugar o hecho).
+- MAYÚSCULAS, entre 2 y 5 palabras completas (máximo 30 caracteres), con un dato concreto (hora, cifra, lugar o hecho) que coincida exactamente con lo que se ve en "plano".
 - PROHIBIDO usar puntos suspensivos (...), rótulos repetidos o palabras sueltas vacías ({", ".join(sorted(PALABRAS_VACIAS))}).
 
 REGLAS DE PLANOS ("plano" y "prompt_imagen"):
 - El campo "plano" DEBE ser exactamente uno de estos: {planos_lista}.
-- Usa "cinta_puerto" en 3 escenas clave (al explicar el lavado/cinta, la inspección omitida y la causa oficial).
+- Usa cada plano como máximo 2 veces en todo el vídeo para garantizar variedad visual total.
+- Usa "cinta_puerto" en 2 o 3 escenas clave cuando se hable de los sensores estáticos o la cinta.
 - Describe siempre en inglés: sujeto físico + plano + luz + ambiente, con superficies lisas ("smooth unmarked metal"). PROHIBIDO pedir personas, caras, pantallas con texto, relojes, papeles o logos.
 
 Devuelve ÚNICAMENTE un JSON válido:
@@ -150,13 +189,12 @@ def _llamar_cerebras(messages: list, temperatura: float = 0.3) -> str:
 
 
 def _auditar_ortografia_llm(cliente: Groq, escenas: list) -> list:
-    """Segunda llamada al LLM a temperatura 0.0 exclusivamente para ortografía y rótulos."""
     payload = [{"i": idx, "n": e["texto_narracion"], "r": e["texto_pantalla"]} for idx, e in enumerate(escenas)]
     prompt_editor = (
         "Eres corrector ortográfico y editor de documentales. Revisa este JSON de escenas:\n"
-        "1. Corrige cualquier falta de ortografía o concordancia (ej. 'OCCUPANTES'->'OCUPANTES', 'NIEBLA DENSO'->'NIEBLA DENSA', 'IMPÁCTO'->'IMPACTO').\n"
+        "1. Corrige cualquier falta de ortografía o concordancia.\n"
         "2. Asegúrate de que cada 'r' tenga entre 2 y 5 palabras en MAYÚSCULAS, máximo 30 caracteres, sin puntos suspensivos y con un dato real de 'n'.\n"
-        "3. Elimina de 'n' cualquier invitación a compartir, dar like o suscribirse.\n"
+        "3. En las 4 últimas escenas sustituye cualquier rótulo genérico (RESUMEN FINAL, CASOS SIMILARES, HONOR LIMA) por datos concretos (ej. 70 VÍCTIMAS EN EL MAR, CUBIERTAS CON BANDERÍN).\n"
         "Devuelve SOLO el array JSON [{\"i\":0,\"n\":\"...\",\"r\":\"...\"}, ...]."
     )
     try:
@@ -235,14 +273,28 @@ def _validar_y_normalizar_escenas(escenas_brutas: list, cliente_groq: Groq = Non
         filtradas = _auditar_ortografia_llm(cliente_groq, filtradas)
 
     rotulos_vistos = set()
-    cinta_count = 0
+    uso_planos = Counter()
+    rotulos_cierre_verificados = [
+        "70 VÍCTIMAS EN EL PACÍFICO",
+        "CUBIERTAS CON BANDERÍN OACI",
+        "DOBLE INSPECCIÓN PREVUELO",
+        "CINTA CAMUFLADA PROHIBIDA",
+    ]
 
     for idx, esc in enumerate(filtradas):
         narracion = _corregir_ortografia(esc["texto_narracion"])
         rotulo = _corregir_ortografia(esc["texto_pantalla"]).replace("...", "").replace("…", "").strip()
 
+        # Bloquear rótulos genéricos o vacíos (especialmente en el tramo final)
+        if any(v in rotulo for v in PALABRAS_VACIAS):
+            if idx >= len(filtradas) - 4:
+                rotulo = rotulos_cierre_verificados[idx % len(rotulos_cierre_verificados)]
+            else:
+                tokens = [w.strip(".,;:¡!¿?") for w in narracion.split() if len(w.strip(".,;:¡!¿?")) > 2]
+                rotulo = " ".join(tokens[:4]).upper()[:30].strip()
+
         palabras_rot = rotulo.split()
-        if not (2 <= len(palabras_rot) <= 5) or len(rotulo) > 30 or any(v in rotulo for v in PALABRAS_VACIAS):
+        if not (2 <= len(palabras_rot) <= 5) or len(rotulo) > 30:
             tokens = [w.strip(".,;:¡!¿?") for w in narracion.split() if len(w.strip(".,;:¡!¿?")) > 2]
             rotulo = " ".join(tokens[:4]).upper()[:30].strip()
 
@@ -252,22 +304,33 @@ def _validar_y_normalizar_escenas(escenas_brutas: list, cliente_groq: Groq = Non
         rotulos_vistos.add(rotulo)
 
         plano = _asignar_plano_valido(esc, idx)
-        if plano == "cinta_puerto":
-            cinta_count += 1
+        # Validación estricta de coherencia rótulo <-> plano
+        if not rotulo_coherente(rotulo, plano):
+            plano = _corregir_plano_por_rotulo(rotulo, plano)
 
+        # Limitar cada plano a máximo 2 apariciones (3 solo para cinta_puerto si lo pide la regla)
+        limite_plano = 3 if plano == "cinta_puerto" else 2
+        if uso_planos[plano] >= limite_plano:
+            candidatos_menos_usados = sorted(BANCO_PLANOS.keys(), key=lambda p: uso_planos[p])
+            for cand in candidatos_menos_usados:
+                if uso_planos[cand] < 2 and rotulo_coherente(rotulo, cand):
+                    plano = cand
+                    break
+
+        uso_planos[plano] += 1
         esc["texto_narracion"] = narracion
         esc["texto_pantalla"] = rotulo
         esc["tipo"] = "imagen"
         esc["plano"] = plano
         esc["prompt_imagen"] = BANCO_PLANOS[plano]
 
-    # Asegurar que cinta_puerto aparezca al menos 2 veces en momentos clave (escenas 4 y 10)
-    if cinta_count < 2 and len(filtradas) > 12:
+    # Garantizar al menos 2 escenas de cinta_puerto
+    if uso_planos["cinta_puerto"] < 2 and len(filtradas) > 12:
         for pos in (4, 10):
             filtradas[pos]["plano"] = "cinta_puerto"
             filtradas[pos]["prompt_imagen"] = BANCO_PLANOS["cinta_puerto"]
 
-    # RITMO FIJO POR CÓDIGO: Exactamente 6 gráficos distintos (1 cada 5 escenas, nunca 2 seguidos)
+    # RITMO FIJO POR CÓDIGO: Exactamente 6 gráficos distintos (1 cada 5 escenas)
     plan_graficos = [
         (3, "INFOGRAFIA:TARJETA_VUELO", "70 OCUPANTES A BORDO"),
         (8, "INFOGRAFIA:ESQUEMA_SENSORES", "3 PUERTOS ESTÁTICOS TAPADOS"),
