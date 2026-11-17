@@ -54,7 +54,15 @@ REGLAS_COHERENCIA = {
     "PUERTO": {"cinta_puerto"},
     "SENSOR": {"cinta_puerto"},
     "CINTA": {"cinta_puerto"},
-    "INSPECCIÓN": {"cinta_puerto", "hangar"},
+    "CUBIERTA": {"cinta_puerto"},
+    "BANDERÍN": {"cinta_puerto"},
+    "INSPECCIÓN": {"hangar", "avion_frontal"},
+    "VERIFICACIÓN": {"hangar", "cabina_pilotos"},
+    "EMERGENCIA": {"cabina_pilotos", "torre_noche"},
+    "ALARMA": {"cabina_pilotos"},
+    "CABINA": {"cabina_pilotos"},
+    "ALTÍMETRO": {"cabina_pilotos"},
+    "VELOCÍMETRO": {"cabina_pilotos"},
     "CAJA NEGRA": {"caja_negra"},
     "GRABADORA": {"caja_negra"},
     "TORRE": {"torre_noche"},
@@ -70,8 +78,23 @@ PALABRAS_VACIAS = {
     "REFLEXIÓN", "MEMORIAL", "ESTADÍSTICAS", "PREGUNTA", "TECNOLOGÍA",
     "LECCIÓN", "CONCLUSIÓN", "LEGADO", "DECISIÓN", "INTERROGANTE", "ESTUDIO",
     "INFORMACIÓN", "ANÁLISIS", "COMPARTE", "SUSCRÍBETE", "TRAGEDIA",
-    "RESUMEN FINAL", "CASOS SIMILARES", "HONOR LIMA",
+    "RESUMEN FINAL", "CASOS SIMILARES", "HONOR LIMA", "MEDIDA CRÍTICA",
+    "INSPECCIÓN AUTOMATIZADA", "LISTA DOBLE INSPECCIÓN", "REDUNDANCIA DE SENSORES",
+    "PITOT INFLUENCIADO",
 }
+
+ROTULOS_DATOS_VERIFICADOS = [
+    "BOEING 757-200 N52AW",
+    "RUTA LIMA A SANTIAGO",
+    "70 PERSONAS A BORDO",
+    "SIN SOBREVIVIENTES",
+    "31 MINUTOS DE VUELO",
+    "IMPACTO FRENTE A CHANCAY",
+    "INFORME OFICIAL CIAA",
+    "BANDERINES OBLIGATORIOS OACI",
+    "CINTA CAMUFLADA PROHIBIDA",
+    "DOBLE VERIFICACIÓN PREVUELO",
+]
 
 CORRECCIONES_ORTOGRAFICAS = {
     r"\bOCCUPANTES\b": "OCUPANTES",
@@ -79,7 +102,37 @@ CORRECCIONES_ORTOGRAFICAS = {
     r"\bIMPÁCTO\b": "IMPACTO",
     r"\bININTERUMPIDA\b": "ININTERRUMPIDA",
     r"\bAEROPERU\b": "AEROPERÚ",
+    r"\bADICIONA\b": "ADICIONAL",
+    r"\bla ala\b": "el ala",
+    r"\b9\.700\b": "9700",
+    r"\btubos?\s+pitot\b": "puertos estáticos",
+    r"\bdel\s+pitot\b": "de los puertos estáticos",
+    r"\bpitot\b": "puerto estático",
 }
+
+
+def _limpiar_narracion_y_datos(texto: str) -> str:
+    res = texto.strip()
+    for patron, reemplazo in CORRECCIONES_ORTOGRAFICAS.items():
+        res = re.sub(patron, reemplazo, res, flags=re.IGNORECASE)
+    # Eliminar alucinaciones de años modernos (ej. "en 2023")
+    res = re.sub(r",?\s*\ben\s+20\d{2}\b", "", res, flags=re.IGNORECASE)
+    res = re.sub(r"\s+([.,;?¿!¡])", r"\1", res)
+    return res.strip()
+
+
+def _recortar_palabras_limpio(texto: str, max_chars: int = 28, max_palabras: int = 4) -> str:
+    palabras = [w.strip(".,;:¡!¿?\"'#") for w in texto.split() if w.strip(".,;:¡!¿?\"'#")]
+    resultado = []
+    for p in palabras[:max_palabras]:
+        candidato = " ".join(resultado + [p])
+        if len(candidato) <= max_chars:
+            resultado.append(p)
+        else:
+            break
+    if len(resultado) < 2 and len(palabras) >= 2:
+        resultado = palabras[:2]
+    return " ".join(resultado).upper()
 
 
 def rotulo_coherente(rotulo: str, plano: str) -> bool:
@@ -111,35 +164,28 @@ def _cargar_ficha(tema: str) -> dict:
     return FICHA_POR_DEFECTO
 
 
-def _corregir_ortografia(texto: str) -> str:
-    res = texto
-    for patron, reemplazo in CORRECCIONES_ORTOGRAFICAS.items():
-        res = re.sub(patron, reemplazo, res, flags=re.IGNORECASE)
-    return res
-
-
 def _build_system_prompt(ficha: dict) -> str:
     planos_lista = ", ".join(BANCO_PLANOS.keys())
-    return f"""Eres el director jefe de un canal documental forense de aviación en YouTube. Escribe un guion de exactamente 34 escenas (duración total 4:30 a 5:15 min) con máximo rigor técnico y tono respetuoso con las víctimas.
+    return f"""Eres el director jefe de un canal documental forense de aviación en YouTube. Escribe un guion de exactamente 34 escenas (duración total 4:20 a 5:00 min) con máximo rigor técnico y tono respetuoso con las víctimas.
 
-FICHA DE HECHOS VERIFICADA (USA SOLO ESTOS DATOS; SI UN DATO NO ESTÁ AQUÍ, NO LO INVENTES):
+FICHA DE HECHOS VERIFICADA (USA SOLO ESTOS DATOS; PROHIBIDO INVENTAR AÑOS COMO 2023 O HABLAR DE TUBOS PITOT):
 {json.dumps(ficha, ensure_ascii=False, indent=2)}
 
-REGLAS OBLIGATORIAS DE ESTRUCTURA Y NARRACIÓN:
-1. GANCHO EN FRÍO (Escenas 1 y 2): Empieza a las 01:10 AM en pleno clímax nocturno sobre el Pacífico con las alarmas sonando antes de rebobinar al despegue en Lima.
-2. RITMO NARRATIVO: Introduce una pregunta o giro técnico cada 5 escenas.
-3. LONGITUD DE NARRACIÓN: Cada "texto_narracion" debe tener entre 14 y 22 palabras claras en español.
-4. ÚLTIMAS 4 ESCENAS: Deben incluir cifras o consecuencias reales de la ficha (ej. "70 VÍCTIMAS EN EL PACÍFICO", "CUBIERTAS CON BANDERÍN OACI", "DOBLE INSPECCIÓN PREVUELO"). PROHIBIDO usar rótulos genéricos como "RESUMEN FINAL", "CASOS SIMILARES" o "HONOR LIMA".
-5. CIERRE DOCUMENTAL: Termina en seco con una pregunta técnica reflexiva para comentarios. PROHIBIDO pedir suscripciones o likes.
+DISTRIBUCIÓN OBLIGATORIA POR BLOQUES:
+- Escenas 1 a 3: Gancho en frío a las 01:10 AM sobre el Pacífico con las alarmas activas antes de rebobinar al despegue.
+- Escenas 4 a 10: Preparación del Boeing 757-200 en Lima, lavado del fuselaje y colocación de cinta plateada sobre los 3 puertos estáticos (NO tubos pitot).
+- Escenas 11 a 18: Despegue a las 00:40 AM bajo niebla densa, conflicto entre velocímetro y altímetro y llamada de emergencia.
+- Escenas 19 a 26: Lectura falsa de 9700 pies en el radar de Lima, descenso ciego sobre el océano e impacto a las 01:11 AM frente a Chancay.
+- Escenas 27 a 31: Operación de búsqueda marítima, recuperación de la caja negra (FDR) y conclusiones técnicas del informe oficial CIAA.
+- Escenas 32 a 34: ÚNICAMENTE aquí menciona las medidas de la OACI (cubiertas con banderines de alta visibilidad y doble verificación prevuelo) y cierra con una pregunta técnica reflexiva.
 
 REGLAS ESTRICTAS DE RÓTULOS ("texto_pantalla"):
-- MAYÚSCULAS, entre 2 y 5 palabras completas (máximo 30 caracteres), con un dato concreto (hora, cifra, lugar o hecho) que coincida exactamente con lo que se ve en "plano".
-- PROHIBIDO usar puntos suspensivos (...), rótulos repetidos o palabras sueltas vacías ({", ".join(sorted(PALABRAS_VACIAS))}).
+- MAYÚSCULAS, entre 2 y 4 palabras completas (MÁXIMO 28 caracteres), con un dato concreto verificable que coincida con "plano".
+- NUNCA repitas un rótulo, nunca uses signos '#' ni frases vagas ({", ".join(sorted(PALABRAS_VACIAS))}).
 
 REGLAS DE PLANOS ("plano" y "prompt_imagen"):
 - El campo "plano" DEBE ser exactamente uno de estos: {planos_lista}.
-- Usa cada plano como máximo 2 veces en todo el vídeo para garantizar variedad visual total.
-- Usa "cinta_puerto" en 2 o 3 escenas clave cuando se hable de los sensores estáticos o la cinta.
+- Usa cada plano como máximo 2 veces (máximo 3 veces "cinta_puerto") y NUNCA pongas el mismo plano en dos escenas consecutivas.
 - Describe siempre en inglés: sujeto físico + plano + luz + ambiente, con superficies lisas ("smooth unmarked metal"). PROHIBIDO pedir personas, caras, pantallas con texto, relojes, papeles o logos.
 
 Devuelve ÚNICAMENTE un JSON válido:
@@ -148,11 +194,11 @@ Devuelve ÚNICAMENTE un JSON válido:
   "descripcion_youtube": "Resumen documental de 3 párrafos citando las fuentes oficiales de la ficha.",
   "tags_youtube": ["aeroperu 603", "misterios de aviacion", "documental aereo", "caja negra", "seguridad aerea"],
   "comentario_fijado": "¿Qué medida de control crees que es más crítica para evitar un fallo así: las cubiertas con banderín o la doble inspección prevuelo?",
-  "prompt_miniatura": "{BANCO_PLANOS['cinta_puerto']}, bright blue lightning bolt in dark storm sky behind the fuselage, 8k",
+  "prompt_miniatura": "{BANCO_PLANOS['cinta_puerto']}, 8k",
   "titulo_miniatura": "LA CINTA MORTAL",
   "escenas": [
     {{
-      "texto_narracion": "Frase documental de 14 a 22 palabras...",
+      "texto_narracion": "Frase documental clara de 14 a 22 palabras...",
       "texto_pantalla": "01:10 AM SOBRE EL PACÍFICO",
       "tipo": "imagen",
       "plano": "cabina_pilotos",
@@ -178,234 +224,4 @@ def _llamar_cerebras(messages: list, temperatura: float = 0.3) -> str:
     api_key = os.environ.get("CEREBRAS_API_KEY")
     if not api_key:
         raise RuntimeError("Falta CEREBRAS_API_KEY")
-    cliente = OpenAI(api_key=api_key, base_url="https://api.cerebras.ai/v1")
-    respuesta = cliente.chat.completions.create(
-        model=MODELO_CEREBRAS,
-        messages=messages,
-        temperature=temperatura,
-        max_tokens=16000,
-    )
-    return respuesta.choices[0].message.content
-
-
-def _auditar_ortografia_llm(cliente: Groq, escenas: list) -> list:
-    payload = [{"i": idx, "n": e["texto_narracion"], "r": e["texto_pantalla"]} for idx, e in enumerate(escenas)]
-    prompt_editor = (
-        "Eres corrector ortográfico y editor de documentales. Revisa este JSON de escenas:\n"
-        "1. Corrige cualquier falta de ortografía o concordancia.\n"
-        "2. Asegúrate de que cada 'r' tenga entre 2 y 5 palabras en MAYÚSCULAS, máximo 30 caracteres, sin puntos suspensivos y con un dato real de 'n'.\n"
-        "3. En las 4 últimas escenas sustituye cualquier rótulo genérico (RESUMEN FINAL, CASOS SIMILARES, HONOR LIMA) por datos concretos (ej. 70 VÍCTIMAS EN EL MAR, CUBIERTAS CON BANDERÍN).\n"
-        "Devuelve SOLO el array JSON [{\"i\":0,\"n\":\"...\",\"r\":\"...\"}, ...]."
-    )
-    try:
-        raw = _llamar_groq(
-            cliente,
-            [
-                {"role": "system", "content": prompt_editor},
-                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
-            ],
-            MODELO_PRINCIPAL,
-            temperatura=0.0,
-        )
-        match = re.search(r"\[.*\]", raw, re.DOTALL)
-        items = json.loads(match.group(0)) if match else json.loads(raw.strip())
-        por_id = {it["i"]: it for it in items if isinstance(it, dict) and "i" in it}
-        for idx, esc in enumerate(escenas):
-            if idx in por_id:
-                esc["texto_narracion"] = _corregir_ortografia(por_id[idx].get("n", esc["texto_narracion"]).strip())
-                esc["texto_pantalla"] = _corregir_ortografia(por_id[idx].get("r", esc["texto_pantalla"]).strip().upper())
-    except Exception as e:
-        print(f"  [Aviso] Segunda pasada ortográfica omitida ({e}).")
-    return escenas
-
-
-def _asignar_plano_valido(esc: dict, idx: int) -> str:
-    plano = str(esc.get("plano", "")).strip().lower()
-    if plano in BANCO_PLANOS:
-        return plano
-    texto = f"{esc.get('texto_narracion', '')} {esc.get('texto_pantalla', '')}".lower()
-    if any(k in texto for k in ("cinta", "puerto", "estático", "sensor", "lavado", "operario")):
-        return "cinta_puerto"
-    if any(k in texto for k in ("impact", "olas", "superficie", "invert", "chancay", "mar")):
-        return "mar_tormenta"
-    if any(k in texto for k in ("caja negra", "grabadora", "registrador", "submar")):
-        return "caja_negra"
-    if any(k in texto for k in ("rescate", "barco", "búsqueda")):
-        return "barco_rescate"
-    if any(k in texto for k in ("cabina", "piloto", "tripulación", "palanca", "alarma")):
-        return "cabina_pilotos"
-    if any(k in texto for k in ("torre", "radar", "controlador")):
-        return "torre_noche"
-    if any(k in texto for k in ("pista", "despeg", "lima", "aeropuerto")):
-        return "pista_lluvia"
-    if any(k in texto for k in ("hangar", "mantenimiento", "inspección")):
-        return "hangar"
-    if any(k in texto for k in ("turbina", "motor")):
-        return "turbina"
-    claves = list(BANCO_PLANOS.keys())
-    return claves[idx % len(claves)]
-
-
-def _validar_y_normalizar_escenas(escenas_brutas: list, cliente_groq: Groq = None) -> list:
-    filtradas = []
-    frases_vistas = set()
-
-    for esc in escenas_brutas:
-        narracion = _corregir_ortografia(esc.get("texto_narracion", "").strip())
-        narracion = re.sub(r"Si este v[íi]deo te result[óo].*$", "", narracion, flags=re.IGNORECASE).strip()
-        if not narracion or any(p in narracion.lower() for p in ("suscr", "compártelo", "comparte este", "dale like")):
-            continue
-
-        firma = " ".join(re.findall(r"[a-záéíóúñ]+", narracion.lower())[:7])
-        if firma in frases_vistas:
-            continue
-        frases_vistas.add(firma)
-
-        rotulo = _corregir_ortografia(esc.get("texto_pantalla", "").strip().upper())
-        rotulo = rotulo.replace("...", "").replace("…", "").strip()
-        esc["texto_narracion"] = narracion
-        esc["texto_pantalla"] = rotulo
-        filtradas.append(esc)
-
-    filtradas = filtradas[:34]
-
-    if cliente_groq is not None:
-        filtradas = _auditar_ortografia_llm(cliente_groq, filtradas)
-
-    rotulos_vistos = set()
-    uso_planos = Counter()
-    rotulos_cierre_verificados = [
-        "70 VÍCTIMAS EN EL PACÍFICO",
-        "CUBIERTAS CON BANDERÍN OACI",
-        "DOBLE INSPECCIÓN PREVUELO",
-        "CINTA CAMUFLADA PROHIBIDA",
-    ]
-
-    for idx, esc in enumerate(filtradas):
-        narracion = _corregir_ortografia(esc["texto_narracion"])
-        rotulo = _corregir_ortografia(esc["texto_pantalla"]).replace("...", "").replace("…", "").strip()
-
-        # Bloquear rótulos genéricos o vacíos (especialmente en el tramo final)
-        if any(v in rotulo for v in PALABRAS_VACIAS):
-            if idx >= len(filtradas) - 4:
-                rotulo = rotulos_cierre_verificados[idx % len(rotulos_cierre_verificados)]
-            else:
-                tokens = [w.strip(".,;:¡!¿?") for w in narracion.split() if len(w.strip(".,;:¡!¿?")) > 2]
-                rotulo = " ".join(tokens[:4]).upper()[:30].strip()
-
-        palabras_rot = rotulo.split()
-        if not (2 <= len(palabras_rot) <= 5) or len(rotulo) > 30:
-            tokens = [w.strip(".,;:¡!¿?") for w in narracion.split() if len(w.strip(".,;:¡!¿?")) > 2]
-            rotulo = " ".join(tokens[:4]).upper()[:30].strip()
-
-        if rotulo in rotulos_vistos:
-            base_corta = " ".join(rotulo.split()[:3])
-            rotulo = f"{base_corta} #{idx + 1}"[:30]
-        rotulos_vistos.add(rotulo)
-
-        plano = _asignar_plano_valido(esc, idx)
-        # Validación estricta de coherencia rótulo <-> plano
-        if not rotulo_coherente(rotulo, plano):
-            plano = _corregir_plano_por_rotulo(rotulo, plano)
-
-        # Limitar cada plano a máximo 2 apariciones (3 solo para cinta_puerto si lo pide la regla)
-        limite_plano = 3 if plano == "cinta_puerto" else 2
-        if uso_planos[plano] >= limite_plano:
-            candidatos_menos_usados = sorted(BANCO_PLANOS.keys(), key=lambda p: uso_planos[p])
-            for cand in candidatos_menos_usados:
-                if uso_planos[cand] < 2 and rotulo_coherente(rotulo, cand):
-                    plano = cand
-                    break
-
-        uso_planos[plano] += 1
-        esc["texto_narracion"] = narracion
-        esc["texto_pantalla"] = rotulo
-        esc["tipo"] = "imagen"
-        esc["plano"] = plano
-        esc["prompt_imagen"] = BANCO_PLANOS[plano]
-
-    # Garantizar al menos 2 escenas de cinta_puerto
-    if uso_planos["cinta_puerto"] < 2 and len(filtradas) > 12:
-        for pos in (4, 10):
-            filtradas[pos]["plano"] = "cinta_puerto"
-            filtradas[pos]["prompt_imagen"] = BANCO_PLANOS["cinta_puerto"]
-
-    # RITMO FIJO POR CÓDIGO: Exactamente 6 gráficos distintos (1 cada 5 escenas)
-    plan_graficos = [
-        (3, "INFOGRAFIA:TARJETA_VUELO", "70 OCUPANTES A BORDO"),
-        (8, "INFOGRAFIA:ESQUEMA_SENSORES", "3 PUERTOS ESTÁTICOS TAPADOS"),
-        (13, "INFOGRAFIA:MAPA_RUTA", "DESVÍO HACIA EL PACÍFICO"),
-        (18, "INFOGRAFIA:PANEL_ALARMAS", "ALARMAS CONTRADICTORIAS"),
-        (23, "INFOGRAFIA:GRAFICA_ALTITUD", "9700 PIES FALSOS EN RADAR"),
-        (28, "INFOGRAFIA:CRONOLOGIA", "31 MINUTOS DE VUELO CIEGO"),
-    ]
-    for pos, codigo_inf, rotulo_inf in plan_graficos:
-        if pos < len(filtradas):
-            filtradas[pos]["tipo"] = "grafico"
-            filtradas[pos]["plano"] = "grafico"
-            filtradas[pos]["prompt_imagen"] = codigo_inf
-            filtradas[pos]["texto_pantalla"] = rotulo_inf
-
-    return filtradas
-
-
-def _parsear_guion(texto: str, ficha: dict, cliente_groq: Groq = None) -> dict:
-    if not texto or not texto.strip():
-        raise ValueError("Respuesta vacía del modelo")
-    match = re.search(r"\{.*\}", texto, re.DOTALL)
-    datos = json.loads(match.group(0)) if match else json.loads(texto.strip())
-    escenas = _validar_y_normalizar_escenas(datos.get("escenas", []), cliente_groq=cliente_groq)
-    if len(escenas) < 24:
-        raise ValueError(f"Escenas insuficientes tras validación: {len(escenas)}")
-
-    datos["escenas"] = escenas
-    datos["titulo_miniatura"] = "LA CINTA MORTAL"
-    datos["prompt_miniatura"] = (
-        f"{BANCO_PLANOS['cinta_puerto']}, bright blue lightning bolt in dark storm sky behind the fuselage, 8k"
-    )
-
-    desc = datos.get("descripcion_youtube", "").strip()
-    fuentes_txt = "\n".join(f"- {f}" for f in ficha.get("fuentes", []))
-    bloque_legal = (
-        f"\n\n📋 Fuentes oficiales verificadas:\n{fuentes_txt}\n"
-        "ℹ️ Nota: Este vídeo contiene recreaciones visuales e infografías generadas digitalmente para ilustrar hechos históricos documentados."
-    )
-    if "Fuentes oficiales" not in desc:
-        desc += bloque_legal
-    datos["descripcion_youtube"] = desc
-    return datos
-
-
-def generar_guion(tema: str) -> dict:
-    api_key = os.environ.get("GROQ_API_KEY")
-    if not api_key:
-        raise RuntimeError("Falta GROQ_API_KEY")
-    cliente = Groq(api_key=api_key)
-    ficha = _cargar_ficha(tema)
-    system_prompt = _build_system_prompt(ficha)
-
-    mensajes = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"Genera el guion documental completo basado en la ficha verificada sobre: {tema}"},
-    ]
-
-    for intento in range(1, 4):
-        modelo = MODELO_PRINCIPAL if intento <= 2 else MODELO_FALLBACK
-        try:
-            print(f"Llamando a Groq ({modelo}, intento {intento}/3)...")
-            texto = _llamar_groq(cliente, mensajes, modelo, temperatura=0.3)
-            return _parsear_guion(texto, ficha, cliente_groq=cliente)
-        except Exception as e:
-            print(f"  [Aviso] Intento {intento} fallido con {modelo}: {e}")
-
-    print("Groq falló, probando Cerebras...")
-    texto = _llamar_cerebras(mensajes, temperatura=0.3)
-    return _parsear_guion(texto, ficha, cliente_groq=cliente)
-
-
-if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        sys.exit(1)
-    guion = generar_guion(sys.argv[1])
-    with open(sys.argv[2], "w", encoding="utf-8") as f:
-        json.dump(guion, f, ensure_ascii=False, indent=2)
+    cliente = OpenAI(api_key
