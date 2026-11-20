@@ -34,7 +34,7 @@ FICHA_POR_DEFECTO = {
 }
 
 BANCO_PLANOS = {
-    "cinta_puerto": "Extreme macro close-up of glossy silver-grey metallic duct tape covering a round chrome static port sensor on a smooth unmarked dark blue aircraft fuselage, dramatic hangar spotlight, shallow depth of field",
+    "cinta_puerto": "Extreme macro close-up of wrinkled silver metallic duct tape directly taped over and completely sealing a round chrome static port sensor on a smooth matte dark blue aircraft fuselage, dramatic spotlight, shallow depth of field",
     "cabina_pilotos": "Dark cinematic view from behind empty cockpit seats looking through windshield into dense night fog and distant lightning over the black ocean, moody blue instrument glow, smooth unmarked surfaces",
     "ala_nubes": "Close-up of a commercial airliner wingtip with red navigation strobe light cutting through dense dark storm clouds and rain at night, dramatic rim lighting, smooth unmarked metal",
     "pista_lluvia": "Low angle shot of wet airport runway centerlines reflecting amber approach lights in dense night fog, cinematic documentary atmosphere, smooth wet asphalt",
@@ -58,6 +58,9 @@ REGLAS_COHERENCIA = {
     "BANDERÍN": {"cinta_puerto"},
     "INSPECCIÓN": {"hangar", "avion_frontal"},
     "VERIFICACIÓN": {"hangar", "cabina_pilotos"},
+    "INVESTIGACIÓN": {"hangar", "caja_negra"},
+    "INFORME": {"hangar", "caja_negra"},
+    "CIAA": {"hangar", "caja_negra"},
     "EMERGENCIA": {"cabina_pilotos", "torre_noche"},
     "ALARMA": {"cabina_pilotos"},
     "CABINA": {"cabina_pilotos"},
@@ -65,6 +68,7 @@ REGLAS_COHERENCIA = {
     "VELOCÍMETRO": {"cabina_pilotos"},
     "CAJA NEGRA": {"caja_negra"},
     "GRABADORA": {"caja_negra"},
+    "RECUPERADA": {"caja_negra", "barco_rescate"},
     "TORRE": {"torre_noche"},
     "RADAR": {"torre_noche"},
     "DESPEGUE": {"pista_lluvia", "avion_frontal"},
@@ -72,6 +76,7 @@ REGLAS_COHERENCIA = {
     "TURBINA": {"turbina"},
     "MOTOR": {"turbina"},
     "RESCATE": {"barco_rescate"},
+    "BÚSQUEDA": {"barco_rescate"},
 }
 
 PALABRAS_VACIAS = {
@@ -80,7 +85,7 @@ PALABRAS_VACIAS = {
     "INFORMACIÓN", "ANÁLISIS", "COMPARTE", "SUSCRÍBETE", "TRAGEDIA",
     "RESUMEN FINAL", "CASOS SIMILARES", "HONOR LIMA", "MEDIDA CRÍTICA",
     "INSPECCIÓN AUTOMATIZADA", "LISTA DOBLE INSPECCIÓN", "REDUNDANCIA DE SENSORES",
-    "PITOT INFLUENCIADO",
+    "PITOT INFLUENCIADO", "BARCO DE RESCUE", "LOS ANALISTAS DEL CIAA", "BANDERINES VISIBLES",
 }
 
 ROTULOS_DATOS_VERIFICADOS = [
@@ -90,19 +95,25 @@ ROTULOS_DATOS_VERIFICADOS = [
     "SIN SOBREVIVIENTES",
     "31 MINUTOS DE VUELO",
     "IMPACTO FRENTE A CHANCAY",
-    "INFORME OFICIAL CIAA",
-    "BANDERINES OBLIGATORIOS OACI",
-    "CINTA CAMUFLADA PROHIBIDA",
+    "INVESTIGACIÓN CIAA",
+    "CAJA NEGRA RECUPERADA",
+    "CINTA PROHIBIDA",
     "DOBLE VERIFICACIÓN PREVUELO",
 ]
 
 CORRECCIONES_ORTOGRAFICAS = {
     r"\bOCCUPANTES\b": "OCUPANTES",
+    r"\bNIEBLA DENSAS\b": "NIEBLA DENSA",
     r"\bNIEBLA DENSO\b": "NIEBLA DENSA",
     r"\bIMPÁCTO\b": "IMPACTO",
     r"\bININTERUMPIDA\b": "ININTERRUMPIDA",
     r"\bAEROPERU\b": "AEROPERÚ",
     r"\bADICIONA\b": "ADICIONAL",
+    r"\bFUSELAGE\b": "FUSELAJE",
+    r"\bRESCUE\b": "RESCATE",
+    r"\bBARCO DE RESCATE\b": "BÚSQUEDA MARÍTIMA",
+    r"\bLOS ANALISTAS DEL CIAA\b": "INVESTIGACIÓN CIAA",
+    r"\bBANDERINES VISIBLES\b": "CINTA PROHIBIDA",
     r"\bla ala\b": "el ala",
     r"\b9\.700\b": "9700",
     r"\btubos?\s+pitot\b": "puertos estáticos",
@@ -176,10 +187,10 @@ DISTRIBUCIÓN OBLIGATORIA POR BLOQUES:
 - Escenas 11 a 18: Despegue a las 00:40 AM bajo niebla densa, conflicto entre velocímetro y altímetro y llamada de emergencia.
 - Escenas 19 a 26: Lectura falsa de 9700 pies en el radar de Lima, descenso ciego sobre el océano e impacto a las 01:11 AM frente a Chancay.
 - Escenas 27 a 31: Operación de búsqueda marítima, recuperación de la caja negra (FDR) y conclusiones técnicas del informe oficial CIAA.
-- Escenas 32 a 34: ÚNICAMENTE aquí menciona las medidas de la OACI (cubiertas con banderines de alta visibilidad y doble verificación prevuelo) y cierra con una pregunta técnica reflexiva.
+- Escenas 32 a 34: ÚNICAMENTE aquí menciona las medidas de la OACI (prohibición de cinta camuflada y doble verificación prevuelo) y cierra con una pregunta técnica reflexiva.
 
 REGLAS ESTRICTAS DE RÓTULOS ("texto_pantalla"):
-- MAYÚSCULAS, entre 2 y 4 palabras completas (MÁXIMO 28 caracteres), con un dato concreto verificable que coincida con "plano".
+- ESPAÑOL CORRECTO EN MAYÚSCULAS (nunca palabras en inglés como RESCUE o FUSELAGE), entre 2 y 4 palabras completas (MÁXIMO 28 caracteres), con un dato concreto verificable que coincida con "plano".
 - NUNCA repitas un rótulo, nunca uses signos '#' ni frases vagas ({", ".join(sorted(PALABRAS_VACIAS))}).
 
 REGLAS DE PLANOS ("plano" y "prompt_imagen"):
@@ -236,8 +247,8 @@ def _llamar_cerebras(messages: list, temperatura: float = 0.3) -> str:
 def _auditar_ortografia_llm(cliente: Groq, escenas: list) -> list:
     payload = [{"i": idx, "n": e["texto_narracion"], "r": e["texto_pantalla"]} for idx, e in enumerate(escenas)]
     prompt_editor = (
-        "Eres corrector ortográfico y editor de documentales de aviación. Revisa este JSON de escenas:\n"
-        "1. Corrige cualquier falta de ortografía o concordancia ('el ala', '9700', 'puertos estáticos' nunca 'pitot').\n"
+        "Eres corrector ortográfico y editor de documentales de aviación en español. Revisa este JSON de escenas:\n"
+        "1. Corrige cualquier falta de ortografía o anglicismo ('RESCATE' nunca 'RESCUE', 'FUSELAJE' nunca 'FUSELAGE', 'NIEBLA DENSA', 'el ala', '9700', 'puertos estáticos' nunca 'pitot').\n"
         "2. Elimina cualquier mención inventada a años como 'en 2023'.\n"
         "3. Asegúrate de que cada 'r' tenga entre 2 y 4 palabras completas en MAYÚSCULAS (MÁXIMO 28 caracteres), sin signos '#' ni frases vagas.\n"
         "4. Asegura que ningún 'r' esté repetido.\n"
@@ -284,7 +295,7 @@ def _asignar_plano_valido(esc: dict, idx: int) -> str:
         return "torre_noche"
     if any(k in texto for k in ("pista", "despeg", "lima", "aeropuerto")):
         return "pista_lluvia"
-    if any(k in texto for k in ("hangar", "mantenimiento", "inspección", "verificación")):
+    if any(k in texto for k in ("hangar", "mantenimiento", "inspección", "verificación", "ciaa", "investig")):
         return "hangar"
     if any(k in texto for k in ("turbina", "motor")):
         return "turbina"
@@ -389,66 +400,4 @@ def _validar_y_normalizar_escenas(escenas_brutas: list, cliente_groq: Groq = Non
             filtradas[pos]["tipo"] = "grafico"
             filtradas[pos]["plano"] = "grafico"
             filtradas[pos]["prompt_imagen"] = codigo_inf
-            filtradas[pos]["texto_pantalla"] = rotulo_inf
-
-    return filtradas
-
-
-def _parsear_guion(texto: str, ficha: dict, cliente_groq: Groq = None) -> dict:
-    if not texto or not texto.strip():
-        raise ValueError("Respuesta vacía del modelo")
-    match = re.search(r"\{.*\}", texto, re.DOTALL)
-    datos = json.loads(match.group(0)) if match else json.loads(texto.strip())
-    escenas = _validar_y_normalizar_escenas(datos.get("escenas", []), cliente_groq=cliente_groq)
-    if len(escenas) < 20:
-        raise ValueError(f"Escenas insuficientes tras validación: {len(escenas)}")
-
-    datos["escenas"] = escenas
-    datos["titulo_miniatura"] = "LA CINTA MORTAL"
-    datos["prompt_miniatura"] = f"{BANCO_PLANOS['cinta_puerto']}, 8k"
-
-    desc = datos.get("descripcion_youtube", "").strip()
-    fuentes_txt = "\n".join(f"- {f}" for f in ficha.get("fuentes", []))
-    bloque_legal = (
-        f"\n\n📋 Fuentes oficiales verificadas:\n{fuentes_txt}\n"
-        "ℹ️ Nota: Este vídeo contiene recreaciones visuales e infografías generadas digitalmente para ilustrar hechos históricos documentados."
-    )
-    if "Fuentes oficiales" not in desc:
-        desc += bloque_legal
-    datos["descripcion_youtube"] = desc
-    return datos
-
-
-def generar_guion(tema: str) -> dict:
-    api_key = os.environ.get("GROQ_API_KEY")
-    if not api_key:
-        raise RuntimeError("Falta GROQ_API_KEY")
-    cliente = Groq(api_key=api_key)
-    ficha = _cargar_ficha(tema)
-    system_prompt = _build_system_prompt(ficha)
-
-    mensajes = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"Genera el guion documental completo basado en la ficha verificada sobre: {tema}"},
-    ]
-
-    for intento in range(1, 4):
-        modelo = MODELO_PRINCIPAL if intento <= 2 else MODELO_FALLBACK
-        try:
-            print(f"Llamando a Groq ({modelo}, intento {intento}/3)...")
-            texto = _llamar_groq(cliente, mensajes, modelo, temperatura=0.3)
-            return _parsear_guion(texto, ficha, cliente_groq=cliente)
-        except Exception as e:
-            print(f"  [Aviso] Intento {intento} fallido con {modelo}: {e}")
-
-    print("Groq falló, probando Cerebras...")
-    texto = _llamar_cerebras(mensajes, temperatura=0.3)
-    return _parsear_guion(texto, ficha, cliente_groq=cliente)
-
-
-if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        sys.exit(1)
-    guion = generar_guion(sys.argv[1])
-    with open(sys.argv[2], "w", encoding="utf-8") as f:
-        json.dump(guion, f, ensure_ascii=False, indent=2)
+            filtradas
