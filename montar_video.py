@@ -75,9 +75,10 @@ def montar_video_final(carpeta_clips: str, carpeta_audios: str, ruta_salida: str
     audio_con_ambiente = ruta_salida + "_audio_con_ambiente_temp.mp3"
     mezclar_con_narracion(audio_temp, ruta_ambiente, audio_con_ambiente)
 
+    # TP=-3.0 + volume=-1.5dB absorbe el sobreimpulso AAC para garantizar max_volume <= -1.5 dB
     comando = [
         "ffmpeg", "-y", "-i", video_temp, "-i", audio_con_ambiente,
-        "-af", "loudnorm=I=-16:TP=-1.5:LRA=11,volume=-1.5dB",
+        "-af", "loudnorm=I=-16:TP=-3.0:LRA=11,volume=-1.5dB",
         "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
         "-map", "0:v:0", "-map", "1:a:0", "-shortest", ruta_salida,
     ]
