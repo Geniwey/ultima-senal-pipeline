@@ -48,112 +48,77 @@ BANCO_PLANOS = {
 }
 
 REGLAS_COHERENCIA = {
-    "IMPACTO": {"mar_tormenta", "ala_nubes"},
-    "OCÉANO": {"mar_tormenta", "barco_rescate"},
-    "MAR": {"mar_tormenta", "barco_rescate"},
-    "PUERTO": {"cinta_puerto"},
-    "SENSOR": {"cinta_puerto"},
-    "CINTA": {"cinta_puerto"},
-    "CUBIERTA": {"cinta_puerto"},
-    "BANDERÍN": {"cinta_puerto"},
-    "INSPECCIÓN": {"hangar", "avion_frontal"},
-    "VERIFICACIÓN": {"hangar", "cabina_pilotos"},
-    "INVESTIGACIÓN": {"hangar", "caja_negra"},
-    "INFORME": {"hangar", "caja_negra"},
-    "CIAA": {"hangar", "caja_negra"},
-    "EMERGENCIA": {"cabina_pilotos", "torre_noche"},
-    "ALARMA": {"cabina_pilotos"},
-    "CABINA": {"cabina_pilotos"},
-    "ALTÍMETRO": {"cabina_pilotos"},
-    "VELOCÍMETRO": {"cabina_pilotos"},
-    "CAJA NEGRA": {"caja_negra"},
-    "GRABADORA": {"caja_negra"},
-    "RECUPERADA": {"caja_negra", "barco_rescate"},
-    "TORRE": {"torre_noche"},
-    "RADAR": {"torre_noche"},
-    "DESPEGUE": {"pista_lluvia", "avion_frontal"},
-    "PISTA": {"pista_lluvia"},
-    "TURBINA": {"turbina"},
-    "MOTOR": {"turbina"},
-    "RESCATE": {"barco_rescate"},
-    "BÚSQUEDA": {"barco_rescate"},
+    "IMPACTO": {"mar_tormenta", "ala_nubes"}, "OCÉANO": {"mar_tormenta", "barco_rescate"},
+    "MAR": {"mar_tormenta", "barco_rescate"}, "PUERTO": {"cinta_puerto"},
+    "SENSOR": {"cinta_puerto"}, "CINTA": {"cinta_puerto"},
+    "CUBIERTA": {"cinta_puerto"}, "BANDERÍN": {"cinta_puerto"},
+    "INSPECCIÓN": {"hangar", "avion_frontal"}, "VERIFICACIÓN": {"hangar", "cabina_pilotos"},
+    "INVESTIGACIÓN": {"hangar", "caja_negra"}, "INFORME": {"hangar", "caja_negra"},
+    "CIAA": {"hangar", "caja_negra"}, "EMERGENCIA": {"cabina_pilotos", "torre_noche"},
+    "ALARMA": {"cabina_pilotos"}, "CABINA": {"cabina_pilotos"},
+    "ALTÍMETRO": {"cabina_pilotos"}, "VELOCÍMETRO": {"cabina_pilotos"},
+    "CAJA NEGRA": {"caja_negra"}, "GRABADORA": {"caja_negra"},
+    "RECUPERADA": {"caja_negra", "barco_rescate"}, "TORRE": {"torre_noche"},
+    "RADAR": {"torre_noche"}, "DESPEGUE": {"pista_lluvia", "avion_frontal"},
+    "PISTA": {"pista_lluvia"}, "TURBINA": {"turbina"},
+    "MOTOR": {"turbina"}, "RESCATE": {"barco_rescate"}, "BÚSQUEDA": {"barco_rescate"},
 }
 
 PALABRAS_VACIAS = {
-    "REFLEXIÓN", "MEMORIAL", "ESTADÍSTICAS", "PREGUNTA", "TECNOLOGÍA",
-    "LECCIÓN", "CONCLUSIÓN", "LEGADO", "DECISIÓN", "INTERROGANTE", "ESTUDIO",
-    "INFORMACIÓN", "ANÁLISIS", "COMPARTE", "SUSCRÍBETE", "TRAGEDIA",
-    "RESUMEN FINAL", "CASOS SIMILARES", "HONOR LIMA", "MEDIDA CRÍTICA",
-    "INSPECCIÓN AUTOMATIZADA", "LISTA DOBLE INSPECCIÓN", "REDUNDANCIA DE SENSORES",
-    "PITOT INFLUENCIADO", "BARCO DE RESCUE", "LOS ANALISTAS DEL CIAA", "BANDERINES VISIBLES",
+    "REFLEXIÓN", "MEMORIAL", "ESTADÍSTICAS", "PREGUNTA", "TECNOLOGÍA", "LECCIÓN",
+    "CONCLUSIÓN", "LEGADO", "DECISIÓN", "INTERROGANTE", "ESTUDIO", "INFORMACIÓN",
+    "ANÁLISIS", "COMPARTE", "SUSCRÍBETE", "TRAGEDIA", "RESUMEN FINAL", "CASOS SIMILARES",
+    "HONOR LIMA", "MEDIDA CRÍTICA", "INSPECCIÓN AUTOMATIZADA", "LISTA DOBLE INSPECCIÓN",
+    "REDUNDANCIA DE SENSORES", "PITOT INFLUENCIADO", "BARCO DE RESCUE",
+    "LOS ANALISTAS DEL CIAA", "BANDERINES VISIBLES",
 }
 
 ROTULOS_DATOS_VERIFICADOS = [
-    "BOEING 757-200 N52AW",
-    "RUTA LIMA A SANTIAGO",
-    "70 PERSONAS A BORDO",
-    "SIN SOBREVIVIENTES",
-    "31 MINUTOS DE VUELO",
-    "IMPACTO FRENTE A CHANCAY",
-    "INVESTIGACIÓN CIAA",
-    "CAJA NEGRA RECUPERADA",
-    "CINTA PROHIBIDA",
+    "BOEING 757-200 N52AW", "RUTA LIMA A SANTIAGO", "70 PERSONAS A BORDO",
+    "SIN SOBREVIVIENTES", "31 MINUTOS DE VUELO", "IMPACTO FRENTE A CHANCAY",
+    "INVESTIGACIÓN CIAA", "CAJA NEGRA RECUPERADA", "CINTA PROHIBIDA",
     "DOBLE VERIFICACIÓN PREVUELO",
 ]
 
 CORRECCIONES_ORTOGRAFICAS = {
-    r"\bOCCUPANTES\b": "OCUPANTES",
-    r"\bNIEBLA DENSAS\b": "NIEBLA DENSA",
-    r"\bNIEBLA DENSO\b": "NIEBLA DENSA",
-    r"\bIMPÁCTO\b": "IMPACTO",
-    r"\bININTERUMPIDA\b": "ININTERRUMPIDA",
-    r"\bAEROPERU\b": "AEROPERÚ",
-    r"\bADICIONA\b": "ADICIONAL",
-    r"\bFUSELAGE\b": "FUSELAJE",
-    r"\bRESCUE\b": "RESCATE",
-    r"\bBARCO DE RESCATE\b": "BÚSQUEDA MARÍTIMA",
+    r"\bOCCUPANTES\b": "OCUPANTES", r"\bNIEBLA DENSAS\b": "NIEBLA DENSA",
+    r"\bNIEBLA DENSO\b": "NIEBLA DENSA", r"\bIMPÁCTO\b": "IMPACTO",
+    r"\bININTERUMPIDA\b": "ININTERRUMPIDA", r"\bAEROPERU\b": "AEROPERÚ",
+    r"\bADICIONA\b": "ADICIONAL", r"\bFUSELAGE\b": "FUSELAJE",
+    r"\bRESCUE\b": "RESCATE", r"\bBARCO DE RESCATE\b": "BÚSQUEDA MARÍTIMA",
     r"\bLOS ANALISTAS DEL CIAA\b": "INVESTIGACIÓN CIAA",
     r"\bBANDERINES VISIBLES\b": "CINTA PROHIBIDA",
-    r"\bla ala\b": "el ala",
-    r"\b9\.700\b": "9700",
+    r"\bla ala\b": "el ala", r"\b9\.700\b": "9700",
     r"\btubos?\s+pitot\b": "puertos estáticos",
-    r"\bdel\s+pitot\b": "de los puertos estáticos",
-    r"\bpitot\b": "puerto estático",
+    r"\bdel\s+pitot\b": "de los puertos estáticos", r"\bpitot\b": "puerto estático",
 }
 
 
-def _limpiar_narracion_y_datos(texto: str) -> str:
+def _limpiar_texto(texto: str) -> str:
     res = texto.strip()
     for patron, reemplazo in CORRECCIONES_ORTOGRAFICAS.items():
         res = re.sub(patron, reemplazo, res, flags=re.IGNORECASE)
     res = re.sub(r",?\s*\ben\s+20\d{2}\b", "", res, flags=re.IGNORECASE)
-    res = re.sub(r"\s+([.,;?¿!¡])", r"\1", res)
-    return res.strip()
+    return re.sub(r"\s+([.,;?¿!¡])", r"\1", res).strip()
 
 
-def _recortar_palabras_limpio(texto: str, max_chars: int = 28, max_palabras: int = 4) -> str:
+def _recortar_palabras(texto: str, max_chars: int = 28) -> str:
     palabras = [w.strip(".,;:¡!¿?\"'#") for w in texto.split() if w.strip(".,;:¡!¿?\"'#")]
-    resultado = []
-    for p in palabras[:max_palabras]:
-        candidato = " ".join(resultado + [p])
-        if len(candidato) <= max_chars:
-            resultado.append(p)
+    res = []
+    for p in palabras[:4]:
+        if len(" ".join(res + [p])) <= max_chars:
+            res.append(p)
         else:
             break
-    if len(resultado) < 2 and len(palabras) >= 2:
-        resultado = palabras[:2]
-    return " ".join(resultado).upper()
+    return " ".join(res if len(res) >= 2 else palabras[:2]).upper()
 
 
-def rotulo_coherente(rotulo: str, plano: str) -> bool:
+def _rotulo_coherente(rotulo: str, plano: str) -> bool:
     rot_up = rotulo.upper()
-    for clave, permitidos in REGLAS_COHERENCIA.items():
-        if clave in rot_up and plano not in permitidos:
-            return False
-    return True
+    return not any(clave in rot_up and plano not in permitidos for clave, permitidos in REGLAS_COHERENCIA.items())
 
 
-def _corregir_plano_por_rotulo(rotulo: str, plano_actual: str) -> str:
+def _corregir_plano(rotulo: str, plano_actual: str) -> str:
     rot_up = rotulo.upper()
     for clave, permitidos in REGLAS_COHERENCIA.items():
         if clave in rot_up and plano_actual not in permitidos:
@@ -161,229 +126,92 @@ def _corregir_plano_por_rotulo(rotulo: str, plano_actual: str) -> str:
     return plano_actual
 
 
-def _cargar_ficha(tema: str) -> dict:
-    ruta_ficha = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ficha.json")
-    if os.path.exists(ruta_ficha):
+def _cargar_ficha() -> dict:
+    ruta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ficha.json")
+    if os.path.exists(ruta):
         try:
-            with open(ruta_ficha, "r", encoding="utf-8") as f:
-                ficha = json.load(f)
-            print("📋 Ficha verificada cargada desde ficha.json")
-            return ficha
-        except Exception as e:
-            print(f"  [Aviso] No se pudo leer ficha.json ({e}), usando ficha integrada.")
+            with open(ruta, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
     return FICHA_POR_DEFECTO
 
 
-def _build_system_prompt(ficha: dict) -> str:
-    planos_lista = ", ".join(BANCO_PLANOS.keys())
-    return f"""Eres el director jefe de un canal documental forense de aviación en YouTube. Escribe un guion de exactamente 34 escenas (duración total 4:20 a 5:00 min) con máximo rigor técnico y tono respetuoso con las víctimas.
-
-FICHA DE HECHOS VERIFICADA (USA SOLO ESTOS DATOS; PROHIBIDO INVENTAR AÑOS COMO 2023 O HABLAR DE TUBOS PITOT):
-{json.dumps(ficha, ensure_ascii=False, indent=2)}
-
-DISTRIBUCIÓN OBLIGATORIA POR BLOQUES:
-- Escenas 1 a 3: Gancho en frío a las 01:10 AM sobre el Pacífico con las alarmas activas antes de rebobinar al despegue.
-- Escenas 4 a 10: Preparación del Boeing 757-200 en Lima, lavado del fuselaje y colocación de cinta plateada sobre los 3 puertos estáticos (NO tubos pitot).
-- Escenas 11 a 18: Despegue a las 00:40 AM bajo niebla densa, conflicto entre velocímetro y altímetro y llamada de emergencia.
-- Escenas 19 a 26: Lectura falsa de 9700 pies en el radar de Lima, descenso ciego sobre el océano e impacto a las 01:11 AM frente a Chancay.
-- Escenas 27 a 31: Operación de búsqueda marítima, recuperación de la caja negra (FDR) y conclusiones técnicas del informe oficial CIAA.
-- Escenas 32 a 34: ÚNICAMENTE aquí menciona las medidas de la OACI (prohibición de cinta camuflada y doble verificación prevuelo) y cierra con una pregunta técnica reflexiva.
-
-REGLAS ESTRICTAS DE RÓTULOS ("texto_pantalla"):
-- ESPAÑOL CORRECTO EN MAYÚSCULAS (nunca palabras en inglés como RESCUE o FUSELAGE), entre 2 y 4 palabras completas (MÁXIMO 28 caracteres), con un dato concreto verificable que coincida con "plano".
-- NUNCA repitas un rótulo, nunca uses signos '#' ni frases vagas ({", ".join(sorted(PALABRAS_VACIAS))}).
-
-REGLAS DE PLANOS ("plano" y "prompt_imagen"):
-- El campo "plano" DEBE ser exactamente uno de estos: {planos_lista}.
-- Usa cada plano como máximo 2 veces (máximo 3 veces "cinta_puerto") y NUNCA pongas el mismo plano en dos escenas consecutivas.
-- Describe siempre en inglés: sujeto físico + plano + luz + ambiente, con superficies lisas ("smooth unmarked metal"). PROHIBIDO pedir personas, caras, pantallas con texto, relojes, papeles o logos.
-
-Devuelve ÚNICAMENTE un JSON válido:
-{{
-  "titulo_video": "El error de 2$ que derribó al Vuelo 603 (Caso Aeroperú)",
-  "descripcion_youtube": "Resumen documental de 3 párrafos citando las fuentes oficiales de la ficha.",
-  "tags_youtube": ["aeroperu 603", "misterios de aviacion", "documental aereo", "caja negra", "seguridad aerea"],
-  "comentario_fijado": "¿Qué medida de control crees que es más crítica para evitar un fallo así: las cubiertas con banderín o la doble inspección prevuelo?",
-  "prompt_miniatura": "{BANCO_PLANOS['cinta_puerto']}, 8k",
-  "titulo_miniatura": "LA CINTA MORTAL",
-  "escenas": [
-    {{
-      "texto_narracion": "Frase documental clara de 14 a 22 palabras...",
-      "texto_pantalla": "01:10 AM SOBRE EL PACÍFICO",
-      "tipo": "imagen",
-      "plano": "cabina_pilotos",
-      "duracion_segundos": 5.5,
-      "prompt_imagen": "Dark cinematic view from behind empty cockpit seats looking into dense night fog and lightning over the ocean, smooth unmarked surfaces"
-    }}
-  ]
-}}"""
-
-
-def _llamar_groq(cliente: Groq, messages: list, modelo: str, temperatura: float = 0.3) -> str:
-    respuesta = cliente.chat.completions.create(
-        model=modelo,
-        messages=messages,
-        temperature=temperatura,
-        max_tokens=16000,
-    )
-    return respuesta.choices[0].message.content
-
-
-def _llamar_cerebras(messages: list, temperatura: float = 0.3) -> str:
-    from openai import OpenAI
-    api_key = os.environ.get("CEREBRAS_API_KEY")
-    if not api_key:
-        raise RuntimeError("Falta CEREBRAS_API_KEY")
-    cliente = OpenAI(api_key=api_key, base_url="https://api.cerebras.ai/v1")
-    respuesta = cliente.chat.completions.create(
-        model=MODELO_CEREBRAS,
-        messages=messages,
-        temperature=temperatura,
-        max_tokens=16000,
-    )
-    return respuesta.choices[0].message.content
-
-
-def _auditar_ortografia_llm(cliente: Groq, escenas: list) -> list:
-    payload = [{"i": idx, "n": e["texto_narracion"], "r": e["texto_pantalla"]} for idx, e in enumerate(escenas)]
-    prompt_editor = (
-        "Eres corrector ortográfico y editor de documentales de aviación en español. Revisa este JSON de escenas:\n"
-        "1. Corrige cualquier falta de ortografía o anglicismo ('RESCATE' nunca 'RESCUE', 'FUSELAJE' nunca 'FUSELAGE', 'NIEBLA DENSA', 'el ala', '9700', 'puertos estáticos' nunca 'pitot').\n"
-        "2. Elimina cualquier mención inventada a años como 'en 2023'.\n"
-        "3. Asegúrate de que cada 'r' tenga entre 2 y 4 palabras completas en MAYÚSCULAS (MÁXIMO 28 caracteres), sin signos '#' ni frases vagas.\n"
-        "4. Asegura que ningún 'r' esté repetido.\n"
-        "Devuelve SOLO el array JSON [{\"i\":0,\"n\":\"...\",\"r\":\"...\"}, ...]."
-    )
-    try:
-        raw = _llamar_groq(
-            cliente,
-            [
-                {"role": "system", "content": prompt_editor},
-                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
-            ],
-            MODELO_PRINCIPAL,
-            temperatura=0.0,
-        )
-        match = re.search(r"\[.*\]", raw, re.DOTALL)
-        items = json.loads(match.group(0)) if match else json.loads(raw.strip())
-        por_id = {it["i"]: it for it in items if isinstance(it, dict) and "i" in it}
-        for idx, esc in enumerate(escenas):
-            if idx in por_id:
-                esc["texto_narracion"] = _limpiar_narracion_y_datos(por_id[idx].get("n", esc["texto_narracion"]))
-                esc["texto_pantalla"] = _limpiar_narracion_y_datos(por_id[idx].get("r", esc["texto_pantalla"])).upper()
-    except Exception as e:
-        print(f"  [Aviso] Segunda pasada ortográfica omitida ({e}).")
-    return escenas
-
-
-def _asignar_plano_valido(esc: dict, idx: int) -> str:
+def _asignar_plano(esc: dict, idx: int) -> str:
     plano = str(esc.get("plano", "")).strip().lower()
     if plano in BANCO_PLANOS:
         return plano
-    texto = f"{esc.get('texto_narracion', '')} {esc.get('texto_pantalla', '')}".lower()
-    if any(k in texto for k in ("cinta", "puerto", "estático", "sensor", "lavado", "operario", "cubierta", "bander")):
-        return "cinta_puerto"
-    if any(k in texto for k in ("impact", "olas", "superficie", "invert", "chancay", "mar", "océano")):
-        return "mar_tormenta"
-    if any(k in texto for k in ("caja negra", "grabadora", "registrador", "submar")):
-        return "caja_negra"
-    if any(k in texto for k in ("rescate", "barco", "búsqueda")):
-        return "barco_rescate"
-    if any(k in texto for k in ("cabina", "piloto", "tripulación", "palanca", "alarma", "altímetro", "velocímetro")):
-        return "cabina_pilotos"
-    if any(k in texto for k in ("torre", "radar", "controlador")):
-        return "torre_noche"
-    if any(k in texto for k in ("pista", "despeg", "lima", "aeropuerto")):
-        return "pista_lluvia"
-    if any(k in texto for k in ("hangar", "mantenimiento", "inspección", "verificación", "ciaa", "investig")):
-        return "hangar"
-    if any(k in texto for k in ("turbina", "motor")):
-        return "turbina"
-    claves = [k for k in BANCO_PLANOS.keys() if k != "cinta_puerto"]
-    return claves[idx % len(claves)]
+    txt = f"{esc.get('texto_narracion', '')} {esc.get('texto_pantalla', '')}".lower()
+    mapa = [
+        (("cinta", "puerto", "estático", "sensor", "lavado", "operario", "cubierta", "bander"), "cinta_puerto"),
+        (("impact", "olas", "superficie", "invert", "chancay", "mar", "océano"), "mar_tormenta"),
+        (("caja negra", "grabadora", "registrador", "submar"), "caja_negra"),
+        (("rescate", "barco", "búsqueda"), "barco_rescate"),
+        (("cabina", "piloto", "tripulación", "palanca", "alarma", "altímetro", "velocímetro"), "cabina_pilotos"),
+        (("torre", "radar", "controlador"), "torre_noche"),
+        (("pista", "despeg", "lima", "aeropuerto"), "pista_lluvia"),
+        (("hangar", "mantenimiento", "inspección", "verificación", "ciaa", "investig"), "hangar"),
+        (("turbina", "motor"), "turbina"),
+    ]
+    for claves, destino in mapa:
+        if any(k in txt for k in claves):
+            return destino
+    otros = [k for k in BANCO_PLANOS if k != "cinta_puerto"]
+    return otros[idx % len(otros)]
 
 
-def _validar_y_normalizar_escenas(escenas_brutas: list, cliente_groq: Groq = None) -> list:
-    filtradas = []
-    frases_vistas = set()
-
+def _validar_escenas(escenas_brutas: list) -> list:
+    filtradas, vistas = [], set()
     for esc in escenas_brutas:
-        narracion = _limpiar_narracion_y_datos(esc.get("texto_narracion", ""))
-        narracion = re.sub(r"Si este v[íi]deo te result[óo].*$", "", narracion, flags=re.IGNORECASE).strip()
-        if not narracion or any(p in narracion.lower() for p in ("suscr", "compártelo", "comparte este", "dale like")):
+        narr = _limpiar_texto(esc.get("texto_narracion", ""))
+        narr = re.sub(r"Si este v[íi]deo te result[óo].*$", "", narr, flags=re.IGNORECASE).strip()
+        if not narr or any(p in narr.lower() for p in ("suscr", "compártelo", "comparte este", "dale like")):
             continue
-
-        firma = " ".join(re.findall(r"[a-záéíóúñ]+", narracion.lower())[:7])
-        if firma in frases_vistas:
+        firma = " ".join(re.findall(r"[a-záéíóúñ]+", narr.lower())[:7])
+        if firma in vistas:
             continue
-        frases_vistas.add(firma)
-
-        rotulo = _limpiar_narracion_y_datos(esc.get("texto_pantalla", "")).upper()
-        rotulo = rotulo.replace("...", "").replace("…", "").strip()
-        esc["texto_narracion"] = narracion
-        esc["texto_pantalla"] = rotulo
+        vistas.add(firma)
+        rot = re.sub(r"#\d+", "", _limpiar_texto(esc.get("texto_pantalla", "")).upper()).replace("...", "").strip()
+        esc["texto_narracion"], esc["texto_pantalla"] = narr, rot
         filtradas.append(esc)
 
     filtradas = filtradas[:34]
-
-    if cliente_groq is not None:
-        filtradas = _auditar_ortografia_llm(cliente_groq, filtradas)
-
-    rotulos_vistos = set()
-    uso_planos = Counter()
-    plano_anterior = ""
-    idx_respaldo_rotulo = 0
+    rotulos_vistos, uso_planos, plano_ant, idx_resp = set(), Counter(), "", 0
 
     for idx, esc in enumerate(filtradas):
-        narracion = _limpiar_narracion_y_datos(esc["texto_narracion"])
-        rotulo = _limpiar_narracion_y_datos(esc["texto_pantalla"]).replace("...", "").replace("…", "").strip()
-        rotulo = re.sub(r"#\d+", "", rotulo).strip()
-
-        if any(v in rotulo for v in PALABRAS_VACIAS) or len(rotulo.split()) < 2 or len(rotulo) > 28:
-            rotulo = _recortar_palabras_limpio(narracion, max_chars=28, max_palabras=4)
-
-        if rotulo in rotulos_vistos or any(v in rotulo for v in PALABRAS_VACIAS):
-            while idx_respaldo_rotulo < len(ROTULOS_DATOS_VERIFICADOS):
-                cand_rot = ROTULOS_DATOS_VERIFICADOS[idx_respaldo_rotulo]
-                idx_respaldo_rotulo += 1
-                if cand_rot not in rotulos_vistos:
-                    rotulo = cand_rot
+        narr, rot = esc["texto_narracion"], esc["texto_pantalla"]
+        if any(v in rot for v in PALABRAS_VACIAS) or len(rot.split()) < 2 or len(rot) > 28:
+            rot = _recortar_palabras(narr)
+        if rot in rotulos_vistos or any(v in rot for v in PALABRAS_VACIAS):
+            while idx_resp < len(ROTULOS_DATOS_VERIFICADOS):
+                cand = ROTULOS_DATOS_VERIFICADOS[idx_resp]
+                idx_resp += 1
+                if cand not in rotulos_vistos:
+                    rot = cand
                     break
-        rotulos_vistos.add(rotulo)
+        rotulos_vistos.add(rot)
 
-        plano = _asignar_plano_valido(esc, idx)
-        if not rotulo_coherente(rotulo, plano):
-            plano = _corregir_plano_por_rotulo(rotulo, plano)
+        plano = _asignar_plano(esc, idx)
+        if not _rotulo_coherente(rot, plano):
+            plano = _corregir_plano(rot, plano)
 
-        limite_plano = 3 if plano == "cinta_puerto" else 2
-        if uso_planos[plano] >= limite_plano or plano == plano_anterior:
-            candidatos = sorted(
-                [p for p in BANCO_PLANOS.keys() if (p != "cinta_puerto" or uso_planos["cinta_puerto"] < 3)],
-                key=lambda p: uso_planos[p],
-            )
-            for cand in candidatos:
-                lim_c = 3 if cand == "cinta_puerto" else 2
-                if cand != plano_anterior and uso_planos[cand] < lim_c and rotulo_coherente(rotulo, cand):
-                    plano = cand
+        lim = 3 if plano == "cinta_puerto" else 2
+        if uso_planos[plano] >= lim or plano == plano_ant:
+            cands = sorted([p for p in BANCO_PLANOS if p != "cinta_puerto" or uso_planos["cinta_puerto"] < 3], key=lambda p: uso_planos[p])
+            for c in cands:
+                if c != plano_ant and uso_planos[c] < (3 if c == "cinta_puerto" else 2) and _rotulo_coherente(rot, c):
+                    plano = c
                     break
-
         uso_planos[plano] += 1
-        plano_anterior = plano
-
-        esc["texto_narracion"] = narracion
-        esc["texto_pantalla"] = rotulo
-        esc["tipo"] = "imagen"
-        esc["plano"] = plano
-        esc["prompt_imagen"] = BANCO_PLANOS[plano]
+        plano_ant = plano
+        esc.update({"texto_pantalla": rot, "tipo": "imagen", "plano": plano, "prompt_imagen": BANCO_PLANOS[plano]})
 
     if uso_planos["cinta_puerto"] < 2 and len(filtradas) > 10:
         for pos in (4, 9):
-            if filtradas[pos]["plano"] != "cinta_puerto":
-                filtradas[pos]["plano"] = "cinta_puerto"
-                filtradas[pos]["prompt_imagen"] = BANCO_PLANOS["cinta_puerto"]
+            filtradas[pos].update({"plano": "cinta_puerto", "prompt_imagen": BANCO_PLANOS["cinta_puerto"]})
 
     total = len(filtradas)
-    plan_graficos = [
+    graficos = [
         (max(2, int(total * 0.09)), "INFOGRAFIA:TARJETA_VUELO", "70 OCUPANTES A BORDO"),
         (max(5, int(total * 0.24)), "INFOGRAFIA:ESQUEMA_SENSORES", "3 PUERTOS ESTÁTICOS TAPADOS"),
         (max(8, int(total * 0.39)), "INFOGRAFIA:MAPA_RUTA", "DESVÍO HACIA EL PACÍFICO"),
@@ -391,13 +219,69 @@ def _validar_y_normalizar_escenas(escenas_brutas: list, cliente_groq: Groq = Non
         (max(14, int(total * 0.69)), "INFOGRAFIA:GRAFICA_ALTITUD", "9700 PIES FALSOS EN RADAR"),
         (max(17, int(total * 0.84)), "INFOGRAFIA:CRONOLOGIA", "31 MINUTOS DE VUELO CIEGO"),
     ]
-    posiciones_usadas = set()
-    for pos, codigo_inf, rotulo_inf in plan_graficos:
-        while pos in posiciones_usadas and pos + 1 < total:
+    usadas = set()
+    for pos, cod, rot in graficos:
+        while pos in usadas and pos + 1 < total:
             pos += 1
         if pos < total:
-            posiciones_usadas.add(pos)
-            filtradas[pos]["tipo"] = "grafico"
-            filtradas[pos]["plano"] = "grafico"
-            filtradas[pos]["prompt_imagen"] = codigo_inf
-            filtradas
+            usadas.add(pos)
+            filtradas[pos].update({"tipo": "grafico", "plano": "grafico", "prompt_imagen": cod, "texto_pantalla": rot})
+    return filtradas
+
+
+def _parsear_guion(texto: str, ficha: dict) -> dict:
+    match = re.search(r"\{.*\}", texto or "", re.DOTALL)
+    if not match:
+        raise ValueError("Respuesta sin JSON válido")
+    datos = json.loads(match.group(0))
+    escenas = _validar_escenas(datos.get("escenas", []))
+    if len(escenas) < 20:
+        raise ValueError(f"Escenas insuficientes: {len(escenas)}")
+    datos.update({
+        "escenas": escenas,
+        "titulo_miniatura": "LA CINTA MORTAL",
+        "prompt_miniatura": f"{BANCO_PLANOS['cinta_puerto']}, 8k",
+    })
+    fuentes_txt = "\n".join(f"- {f}" for f in ficha.get("fuentes", []))
+    desc = datos.get("descripcion_youtube", "").strip()
+    if "Fuentes oficiales" not in desc:
+        desc += f"\n\n📋 Fuentes oficiales verificadas:\n{fuentes_txt}\nℹ️ Nota: Este vídeo contiene recreaciones visuales e infografías generadas digitalmente para ilustrar hechos históricos documentados."
+    datos["descripcion_youtube"] = desc
+    return datos
+
+
+def generar_guion(tema: str) -> dict:
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError("Falta GROQ_API_KEY")
+    cliente = Groq(api_key=api_key)
+    ficha = _cargar_ficha()
+    planos_lista = ", ".join(BANCO_PLANOS.keys())
+    sys_prompt = (
+        f"Director documental de aviación. Escribe un guion de 34 escenas basado SOLO en esta ficha (NO inventes años como 2023 ni menciones pitot, son puertos estáticos):\n"
+        f"{json.dumps(ficha, ensure_ascii=False)}\n"
+        f"Bloques: 1-3 clímax 01:10 AM; 4-10 cinta en puertos estáticos; 11-18 despegue 00:40 AM y emergencia; 19-26 9700 pies falsos e impacto 01:11 AM; 27-31 caja negra e informe CIAA; 32-34 normas OACI y pregunta final.\n"
+        f"Rótulos 'texto_pantalla': ESPAÑOL MAYÚSCULAS, 2-4 palabras (máx 28 caracteres), dato real acorde a 'plano' ({planos_lista}).\n"
+        f"Devuelve SOLO JSON con: titulo_video, descripcion_youtube, tags_youtube, comentario_fijado, escenas:[{{texto_narracion, texto_pantalla, plano}}]."
+    )
+    msgs = [{"role": "system", "content": sys_prompt}, {"role": "user", "content": f"Tema: {tema}"}]
+    for intento in range(1, 4):
+        modelo = MODELO_PRINCIPAL if intento <= 2 else MODELO_FALLBACK
+        try:
+            print(f"Llamando a Groq ({modelo}, intento {intento}/3)...")
+            resp = cliente.chat.completions.create(model=modelo, messages=msgs, temperature=0.3, max_tokens=16000)
+            return _parsear_guion(resp.choices[0].message.content, ficha)
+        except Exception as e:
+            print(f"  [Aviso] Intento {intento} fallido: {e}")
+    from openai import OpenAI
+    c_cer = OpenAI(api_key=os.environ.get("CEREBRAS_API_KEY"), base_url="https://api.cerebras.ai/v1")
+    resp = c_cer.chat.completions.create(model=MODELO_CEREBRAS, messages=msgs, temperature=0.3, max_tokens=16000)
+    return _parsear_guion(resp.choices[0].message.content, ficha)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        sys.exit(1)
+    guion = generar_guion(sys.argv[1])
+    with open(sys.argv[2], "w", encoding="utf-8") as f:
+        json.dump(guion, f, ensure_ascii=False, indent=2)
