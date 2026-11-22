@@ -9,31 +9,29 @@ import re
 ESTILO_BASE = "cinematic documentary photography, photorealistic, sharp focus, smooth unmarked metallic surfaces, dramatic moody lighting, 8k"
 TIMEOUT = 40
 TAMANO_MINIMO_BYTES = 12_000
-_cf_flux_agotado = [False]
-_cf_sdxl_agotado = [False]
-_pol_agotado = [False]
+_agotado = {"cf_flux": False, "cf_sdxl": False, "hf": False, "pol": False}
 _ultima_fue_emergencia = [False]
 _hashes_usados = []
 _aprobadas_por_plano = {}
 _aprobadas_generales = []
-_reutilizaciones_por_ruta = {}
-_indice_rotacion_banco = [0]
-_urls_wikimedia_usadas = set()
-_stats = {"generadas_ia": 0, "wikimedia_real": 0, "rechazadas_qa": 0, "reutilizadas_banco": 0, "infografias": 0}
+_reutilizaciones = {}
+_idx_banco = [0]
+_urls_usadas = set()
+_stats = {"generadas_ia": 0, "archivo_real": 0, "rechazadas_qa": 0, "reutilizadas_banco": 0, "infografias": 0}
 
-QUERIES_WIKIMEDIA_POR_PLANO = {
-    "cinta_puerto": "Boeing 757 fuselage static port close up",
+QUERIES_ARCHIVO = {
+    "cinta_puerto": "Boeing 757 fuselage static port",
     "cabina_pilotos": "Boeing 757 cockpit night instruments",
-    "ala_nubes": "aircraft wing clouds sunset sky",
+    "ala_nubes": "aircraft wing storm clouds night",
     "pista_lluvia": "airport runway night lights rain",
     "turbina": "jet engine turbofan blades close up",
-    "mar_tormenta": "stormy ocean waves dark sea",
-    "barco_rescate": "coast guard rescue ship ocean",
-    "caja_negra": "flight data recorder black box aviation",
-    "hangar": "Boeing 757 aircraft maintenance hangar",
-    "avion_frontal": "Boeing 757 commercial airliner",
-    "torre_noche": "airport air traffic control tower night",
-    "general": "commercial airliner clouds sky",
+    "mar_tormenta": "stormy ocean waves dark sea night",
+    "barco_rescate": "coast guard ship night ocean",
+    "caja_negra": "flight data recorder orange box",
+    "hangar": "Boeing 757 maintenance hangar night",
+    "avion_frontal": "Boeing 757 airliner clouds",
+    "torre_noche": "airport control tower night fog",
+    "general": "commercial airliner night sky",
 }
 
 
@@ -46,8 +44,7 @@ def obtener_estadisticas_imagenes() -> dict:
 
 
 def obtener_mejor_imagen_plano(plano: str) -> str:
-    candidatas = sorted(_aprobadas_por_plano.get(plano, []), key=lambda x: x[0], reverse=True)
-    for _, ruta in candidatas:
+    for _, ruta in sorted(_aprobadas_por_plano.get(plano, []), key=lambda x: x[0], reverse=True):
         if os.path.exists(ruta):
             return ruta
     return ""
@@ -70,24 +67,22 @@ def _generar_infografia_codigo(tipo: str, ruta_salida: str) -> bool:
         if "TARJETA_VUELO" in tipo:
             ax.axis("off")
             ax.set_title("EXPEDIENTE TÉCNICO: VUELO AEROPERÚ 603", color="#00E5FF", fontsize=28, fontweight="bold", pad=22)
-            tarjetas = [
+            for x, txt, col in [
                 (0.18, "AERONAVE\n\nBOEING 757-200\nMatrícula N52AW", "#00E5FF"),
                 (0.50, "OCUPANTES\n\n70 PERSONAS\n61 Pasajeros · 9 Tripul.", "#FFAA00"),
                 (0.82, "RUTA Y FECHA\n\nLIMA → SANTIAGO\n2 Octubre 1996", "#FF3333"),
-            ]
-            for x, txt, col in tarjetas:
+            ]:
                 bbox = dict(boxstyle="round,pad=0.65", facecolor="#101C2E", edgecolor=col, linewidth=4)
                 ax.text(x, 0.56, txt, color="#FFFFFF", fontsize=22, fontweight="bold", ha="center", va="center", bbox=bbox, transform=ax.transAxes)
 
         elif "ESQUEMA_SENSORES" in tipo:
             ax.axis("off")
             ax.set_title("INFORME FORENSE: CÓMO LA CINTA ENGAÑÓ AL AVIÓN", color="#FFFFFF", fontsize=28, fontweight="bold", pad=22)
-            bloques = [
+            for x, txt, col in [
                 (0.18, "1. SENSOR TAPADO\n\nBloquea presión\natmosférica real", "#FF3333"),
                 (0.50, "2. COMPUTADORA\n\nCongela altitud en\n9.700 pies falsos", "#FFAA00"),
                 (0.82, "3. RADAR DE LIMA\n\nRecibe lectura falsa\ndel transpondedor", "#00E5FF"),
-            ]
-            for x, txt, col in bloques:
+            ]:
                 bbox = dict(boxstyle="round,pad=0.65", facecolor="#101C2E", edgecolor=col, linewidth=4)
                 ax.text(x, 0.56, txt, color="#FFFFFF", fontsize=22, fontweight="bold", ha="center", va="center", bbox=bbox, transform=ax.transAxes)
             ax.annotate("", xy=(0.35, 0.56), xytext=(0.31, 0.56), arrowprops=dict(facecolor="#FFFFFF", width=4), transform=ax.transAxes)
@@ -184,7 +179,7 @@ def _validar_imagen(ruta: str) -> bool:
         return cab.startswith(b"\x89PNG") or cab.startswith(b"\xff\xd8\xff")
 
 
-def _recortar_y_normalizar_16_9(ruta: str, recortar_wm: bool = False, tono_doc: bool = False):
+def _normalizar_16_9(ruta: str, recortar_wm: bool = False, tono_doc: bool = False):
     try:
         import numpy as np
         from PIL import Image, ImageEnhance, ImageOps
@@ -221,50 +216,49 @@ def _calcular_dhash(img_rgb) -> int:
 
 
 def _evaluar_calidad(ruta: str, permitir_dup: bool = False, es_mini: bool = False) -> tuple:
-    try:
-        import numpy as np
-        import pytesseract
-        from PIL import Image, ImageFilter
+    import numpy as np
+    import pytesseract
+    from PIL import Image, ImageFilter, ImageOps
 
-        img_rgb = Image.open(ruta).convert("RGB")
-        arr = np.array(img_rgb, dtype=np.float32)
-        brillo, contraste = float(arr.mean()), float(arr.std())
-        pct_quemado = float((arr.mean(axis=2) > 245).mean())
-        if brillo < 12.0 or brillo > 215.0 or contraste < 16.0:
-            return (False, f"brillo/contraste fuera de rango ({brillo:.1f}/{contraste:.1f})")
-        if es_mini and pct_quemado > 0.08:
-            return (False, f"zona quemada ({pct_quemado:.2f})")
+    img_rgb = Image.open(ruta).convert("RGB")
+    arr = np.array(img_rgb, dtype=np.float32)
+    brillo, contraste = float(arr.mean()), float(arr.std())
+    pct_quemado = float((arr.mean(axis=2) > 245).mean())
+    if brillo < 12.0 or brillo > 215.0 or contraste < 16.0:
+        return (False, f"brillo/contraste ({brillo:.1f}/{contraste:.1f})")
+    if es_mini and pct_quemado > 0.08:
+        return (False, f"zona quemada ({pct_quemado:.2f})")
 
-        nitidez = float(np.array(img_rgb.convert("L").filter(ImageFilter.FIND_EDGES), dtype=np.float32).std())
-        if nitidez < 1.5:
-            return (False, f"borrosa ({nitidez:.1f})")
+    nitidez = float(np.array(img_rgb.convert("L").filter(ImageFilter.FIND_EDGES), dtype=np.float32).std())
+    if nitidez < 1.5:
+        return (False, f"borrosa ({nitidez:.1f})")
 
-        peq = img_rgb.resize((1024, 576), Image.Resampling.LANCZOS)
-        datos = pytesseract.image_to_data(peq, config="--psm 11", output_type=pytesseract.Output.DICT)
+    # Doble escaneo OCR (normal e invertido) para detectar texto blanco en cascos/fuselajes
+    gris = img_rgb.resize((1024, 576), Image.Resampling.LANCZOS).convert("L")
+    for variante in (gris, ImageOps.invert(gris)):
+        datos = pytesseract.image_to_data(variante, config="--psm 11", output_type=pytesseract.Output.DICT)
         for txt, conf in zip(datos["text"], datos["conf"]):
             letras = re.sub(r"[^A-Za-z]", "", txt.strip())
             c_val = float(conf) if str(conf).lstrip("-").isdigit() else 0.0
-            if len(letras) >= 3 and c_val >= 65.0:
-                return (False, f"texto OCR: '{txt}'")
+            if len(letras) >= 3 and c_val >= 58.0:
+                return (False, f"texto basura OCR: '{txt}'")
 
-        dh = _calcular_dhash(img_rgb)
-        if not permitir_dup and any(bin(dh ^ h).count("1") <= 6 for h in _hashes_usados):
-            return (False, "duplicada")
-        return (True, contraste + nitidez * 2.5 - pct_quemado * 150.0)
-    except Exception:
-        return (True, 50.0)
+    dh = _calcular_dhash(img_rgb)
+    if not permitir_dup and any(bin(dh ^ h).count("1") <= 6 for h in _hashes_usados):
+        return (False, "imagen duplicada")
+    return (True, contraste + nitidez * 2.5 - pct_quemado * 150.0)
 
 
 def _descargar_cf(prompt: str, destino: str, modelo: str) -> bool:
-    es_flux = "flux" in modelo
-    if (es_flux and _cf_flux_agotado[0]) or (not es_flux and _cf_sdxl_agotado[0]):
+    clave = "cf_flux" if "flux" in modelo else "cf_sdxl"
+    if _agotado[clave]:
         return False
     acc, tok = os.environ.get("CF_ACCOUNT_ID"), os.environ.get("CF_API_TOKEN")
     if not acc or not tok:
         return False
     url = f"https://api.cloudflare.com/client/v4/accounts/{acc}/ai/run/{modelo}"
     try:
-        payload = {"prompt": prompt, "steps": 4} if es_flux else {"prompt": prompt}
+        payload = {"prompt": prompt, "steps": 4} if clave == "cf_flux" else {"prompt": prompt}
         r = requests.post(url, headers={"Authorization": f"Bearer {tok}"}, json=payload, timeout=TIMEOUT)
         if r.status_code == 200:
             if "application/json" in r.headers.get("Content-Type", ""):
@@ -274,22 +268,38 @@ def _descargar_cf(prompt: str, destino: str, modelo: str) -> bool:
             else:
                 open(destino, "wb").write(r.content)
             if _validar_imagen(destino):
-                _recortar_y_normalizar_16_9(destino)
+                _normalizar_16_9(destino)
                 return True
-        else:
-            print(f"  [API Cloudflare {modelo.split('/')[-1]}] HTTP {r.status_code}")
-            if r.status_code == 429:
-                if es_flux:
-                    _cf_flux_agotado[0] = True
-                else:
-                    _cf_sdxl_agotado[0] = True
-    except Exception as e:
-        print(f"  [API Cloudflare] Error: {e}")
+        elif r.status_code == 429:
+            _agotado[clave] = True
+    except Exception:
+        pass
+    return False
+
+
+def _descargar_hf(prompt: str, destino: str) -> bool:
+    if _agotado["hf"]:
+        return False
+    tok = os.environ.get("HF_TOKEN", "").strip()
+    if not tok:
+        return False
+    url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
+    try:
+        r = requests.post(url, headers={"Authorization": f"Bearer {tok}"}, json={"inputs": prompt}, timeout=TIMEOUT)
+        if r.status_code == 200:
+            open(destino, "wb").write(r.content)
+            if _validar_imagen(destino):
+                _normalizar_16_9(destino)
+                return True
+        elif r.status_code in (402, 429):
+            _agotado["hf"] = True
+    except Exception:
+        pass
     return False
 
 
 def _descargar_pol(prompt: str, destino: str, semilla: int) -> bool:
-    if _pol_agotado[0]:
+    if _agotado["pol"]:
         return False
     key = os.environ.get("POLLINATIONS_API_KEY", "").strip()
     q = urllib.parse.quote(prompt)
@@ -300,41 +310,55 @@ def _descargar_pol(prompt: str, destino: str, semilla: int) -> bool:
         if r.status_code == 200:
             open(destino, "wb").write(r.content)
             if _validar_imagen(destino):
-                _recortar_y_normalizar_16_9(destino, recortar_wm=(not key))
+                _normalizar_16_9(destino, recortar_wm=(not key))
                 return True
-        else:
-            print(f"  [API Pollinations] HTTP {r.status_code}")
-            if r.status_code in (401, 402, 429) and not key:
-                _pol_agotado[0] = True
-    except Exception as e:
-        print(f"  [API Pollinations] Error: {e}")
+        elif r.status_code in (401, 402, 429) and not key:
+            _agotado["pol"] = True
+    except Exception:
+        pass
     return False
 
 
-def _descargar_wikimedia(plano: str, destino: str, semilla: int) -> bool:
-    query = QUERIES_WIKIMEDIA_POR_PLANO.get(plano, QUERIES_WIKIMEDIA_POR_PLANO["general"])
-    headers = {"User-Agent": "UltimaSenalDocBot/1.0 (educational aviation documentary)"}
+def _descargar_archivo(plano: str, destino: str, semilla: int) -> bool:
+    query = QUERIES_ARCHIVO.get(plano, QUERIES_ARCHIVO["general"])
+    pexels_key = os.environ.get("PEXELS_API_KEY", "").strip()
+    if pexels_key:
+        try:
+            rp = requests.get("https://api.pexels.com/v1/search", headers={"Authorization": pexels_key}, params={"query": query, "orientation": "landscape", "per_page": 10}, timeout=20)
+            fotos = rp.json().get("photos", []) if rp.status_code == 200 else []
+            for f in fotos[semilla % max(1, len(fotos)):] + fotos[:semilla % max(1, len(fotos))]:
+                u = f.get("src", {}).get("large2x")
+                if u and u not in _urls_usadas:
+                    ri = requests.get(u, timeout=25)
+                    if ri.status_code == 200:
+                        open(destino, "wb").write(ri.content)
+                        if _validar_imagen(destino):
+                            _normalizar_16_9(destino, tono_doc=True)
+                            _urls_usadas.add(u)
+                            _stats["archivo_real"] += 1
+                            return True
+        except Exception:
+            pass
+
+    headers = {"User-Agent": "UltimaSenalDocBot/1.0 (aviation documentary)"}
     params = {"action": "query", "generator": "search", "gsrsearch": f"filetype:bitmap {query}", "gsrnamespace": 6, "gsrlimit": 15, "prop": "imageinfo", "iiprop": "url|size", "iiurlwidth": 1280, "format": "json"}
     try:
         r = requests.get("https://commons.wikimedia.org/w/api.php", params=params, headers=headers, timeout=20)
         pages = list(r.json().get("query", {}).get("pages", {}).values()) if r.status_code == 200 else []
-        if not pages:
-            return False
-        off = semilla % len(pages)
-        for p in pages[off:] + pages[:off]:
-            info = (p.get("imageinfo") or [{}])[0]
-            img_url = info.get("thumburl") or info.get("url")
-            if not img_url or info.get("width", 0) < 800 or info.get("height", 0) < 450 or img_url in _urls_wikimedia_usadas:
-                continue
-            ri = requests.get(img_url, headers=headers, timeout=25)
-            if ri.status_code == 200:
-                open(destino, "wb").write(ri.content)
-                if _validar_imagen(destino):
-                    _recortar_y_normalizar_16_9(destino, tono_doc=True)
-                    _urls_wikimedia_usadas.add(img_url)
-                    _stats["wikimedia_real"] += 1
-                    print(f"  📷 [Archivo Fotográfico] Foto real obtenida para '{plano}'.")
-                    return True
+        if pages:
+            off = semilla % len(pages)
+            for p in pages[off:] + pages[:off]:
+                info = (p.get("imageinfo") or [{}])[0]
+                u = info.get("thumburl") or info.get("url")
+                if u and info.get("width", 0) >= 800 and info.get("height", 0) >= 450 and u not in _urls_usadas:
+                    ri = requests.get(u, headers=headers, timeout=25)
+                    if ri.status_code == 200:
+                        open(destino, "wb").write(ri.content)
+                        if _validar_imagen(destino):
+                            _normalizar_16_9(destino, tono_doc=True)
+                            _urls_usadas.add(u)
+                            _stats["archivo_real"] += 1
+                            return True
     except Exception:
         pass
     return False
@@ -351,13 +375,19 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None, es
     seed_base = semilla if semilla is not None else abs(hash(prompt_escena)) % 10000
 
     validas, objetivo = [], (3 if es_miniatura else 1)
-    intentos = [("cf_flux", 0), ("cf_sdxl", 1), ("pol", seed_base + 11), ("cf_sdxl_2", 2)] + ([("cf_flux_2", 3)] if es_miniatura else [])
+    intentos = [("cf_flux", 0), ("cf_sdxl", 1), ("hf", 2), ("pol", seed_base + 11)] + ([("cf_flux_2", 3)] if es_miniatura else [])
 
     for i, (prov, s) in enumerate(intentos):
         cand = f"{ruta_salida}_cand_{i}.png"
-        ok = _descargar_cf(prompt_completo, cand, "@cf/black-forest-labs/flux-1-schnell") if prov.startswith("cf_flux") else (
-            _descargar_cf(prompt_completo, cand, "@cf/bytedance/stable-diffusion-xl-lightning") if prov.startswith("cf_sdxl") else _descargar_pol(prompt_completo, cand, s)
-        )
+        if prov.startswith("cf_flux"):
+            ok = _descargar_cf(prompt_completo, cand, "@cf/black-forest-labs/flux-1-schnell")
+        elif prov.startswith("cf_sdxl"):
+            ok = _descargar_cf(prompt_completo, cand, "@cf/bytedance/stable-diffusion-xl-lightning")
+        elif prov == "hf":
+            ok = _descargar_hf(prompt_completo, cand)
+        else:
+            ok = _descargar_pol(prompt_completo, cand, s)
+
         if ok:
             es_val, info = _evaluar_calidad(cand, permitir_dup=es_miniatura, es_mini=es_miniatura)
             if es_val:
@@ -366,7 +396,7 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None, es
                     break
             else:
                 _stats["rechazadas_qa"] += 1
-                print(f"  ⚠️ [QA] Candidata descartada: {info}")
+                print(f"  ⚠️ [QA] Descartada: {info}")
                 if os.path.exists(cand):
                     os.remove(cand)
 
@@ -379,34 +409,30 @@ def generar_imagen(prompt_escena: str, ruta_salida: str, semilla: int = None, es
                 os.remove(sob)
         if not es_miniatura:
             _stats["generadas_ia"] += 1
-            try:
-                from PIL import Image
-                _hashes_usados.append(_calcular_dhash(Image.open(ruta_salida).convert("RGB")))
-            except Exception:
-                pass
+            from PIL import Image
+            _hashes_usados.append(_calcular_dhash(Image.open(ruta_salida).convert("RGB")))
             _aprobadas_por_plano.setdefault(plano, []).append((score, ruta_salida))
             if plano != "cinta_puerto":
                 _aprobadas_generales.append(ruta_salida)
         return True
 
-    if not es_miniatura and _descargar_wikimedia(plano, ruta_salida, seed_base):
+    if not es_miniatura and _descargar_archivo(plano, ruta_salida, seed_base):
         _aprobadas_por_plano.setdefault(plano, []).append((40.0, ruta_salida))
         if plano != "cinta_puerto":
             _aprobadas_generales.append(ruta_salida)
         return True
 
     _ultima_fue_emergencia[0] = True
-    mismo_p = [r for _, r in _aprobadas_por_plano.get(plano, []) if _reutilizaciones_por_ruta.get(r, 0) < 1]
-    gen_libre = [r for r in _aprobadas_generales if _reutilizaciones_por_ruta.get(r, 0) < 1]
+    mismo_p = [r for _, r in _aprobadas_por_plano.get(plano, []) if _reutilizaciones.get(r, 0) < 1]
+    gen_libre = [r for r in _aprobadas_generales if _reutilizaciones.get(r, 0) < 1]
     pool = mismo_p or gen_libre or _aprobadas_generales
-    fuente = pool[_indice_rotacion_banco[0] % len(pool)] if pool else None
-    _indice_rotacion_banco[0] += 1
+    fuente = pool[_idx_banco[0] % len(pool)] if pool else None
+    _idx_banco[0] += 1
 
     if fuente and os.path.exists(fuente):
         shutil.copy2(fuente, ruta_salida)
-        _reutilizaciones_por_ruta[fuente] = _reutilizaciones_por_ruta.get(fuente, 0) + 1
+        _reutilizaciones[fuente] = _reutilizaciones.get(fuente, 0) + 1
         _stats["reutilizadas_banco"] += 1
-        print(f"  🔄 [Banco Planos] Reutilizada toma aprobada de '{plano}'.")
         return True
     return False
 
