@@ -1,53 +1,54 @@
-name: Generar Video Última Señal
+name: Generar Video Definitivo
 
 on:
   workflow_dispatch:
     inputs:
-      titulo:
-        description: "Título/tema del vídeo (ej: Aeroperú 603: el vuelo que voló ciego)"
+      tema:
+        description: 'Tema del documental'
         required: true
-        type: string
+        default: 'Aeroperú 603: el vuelo que voló ciego'
 
 jobs:
-  generar-video:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
-
     steps:
-      - name: Checkout del repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Instalar Python
+      - name: Configurar Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Instalar FFmpeg y Tesseract OCR
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg tesseract-ocr
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa
 
       - name: Instalar dependencias Python
-        run: pip install requests groq openai edge-tts gTTS gradio_client pillow pytesseract opencv-python-headless numpy matplotlib
+        run: |
+          pip install --upgrade pip
+          pip install groq openai requests pillow numpy matplotlib edge-tts pytesseract
 
-      - name: Ejecutar pipeline completo
+      - name: Test de integridad antes de ejecutar
+        run: python test_pipeline.py
+
+      - name: Ejecutar pipeline documental
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
-        run: python pipeline_auto.py "${{ inputs.titulo }}"
+          POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: python pipeline_auto.py "${{ github.event.inputs.tema }}"
 
-      - name: Subir video final
-        if: always()
+      - name: Subir artefactos generados
         uses: actions/upload-artifact@v4
         with:
-          name: video-${{ github.run_id }}
+          name: video-definitivo-${{ github.run_id }}
           path: |
-            proyecto/video_final.mp4
-            proyecto/miniatura.png
-            proyecto/metadata_youtube.txt
-            proyecto/guion.json
-            proyecto/imagenes/
-          retention-days: 21
+            output/*.mp4
+            output/*.jpg
+            output/*.png
+            output/*.json
