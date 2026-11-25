@@ -43,12 +43,19 @@ jobs:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
         run: python pipeline_auto.py "${{ github.event.inputs.tema }}"
 
+      - name: Recopilar archivos finales para descarga
+        run: |
+          mkdir -p artefactos_finales
+          find . -maxdepth 3 -not -path '*/.*' -not -path './artefactos_finales*' \
+            \( -name "*.mp4" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.png" -o -name "*.json" \) \
+            ! -name "clip_*.mp4" ! -name "escena_*.png" ! -name "*_cand_*.png" ! -name "*_temp*" \
+            -exec cp {} artefactos_finales/ \;
+          echo "=== ARCHIVOS LISTOS PARA DESCARGAR ==="
+          ls -lh artefactos_finales/
+
       - name: Subir artefactos generados
         uses: actions/upload-artifact@v4
         with:
           name: video-definitivo-${{ github.run_id }}
-          path: |
-            output/*.mp4
-            output/*.jpg
-            output/*.png
-            output/*.json
+          path: artefactos_finales/
+          if-no-files-found: error
