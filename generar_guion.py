@@ -50,15 +50,15 @@ BANCO_PLANOS = {
 ROTULOS_POR_PLANO = {
     "cinta_puerto": ["CINTA SOBRE PUERTOS ESTÁTICOS", "3 SENSORES BLOQUEADOS", "CINTA CAMUFLADA PROHIBIDA"],
     "cabina_pilotos": ["ALARMAS CONTRADICTORIAS", "ALTÍMETRO Y VELOCÍMETRO FALLAN", "EMERGENCIA EN CABINA"],
-    "pista_lluvia": ["DESPEGUE 00:40 AM LIMA", "PISTA BAJO NIEBLA DENSA"],
-    "turbina": ["BOEING 757-200 N52AW", "ASCENSO SOBRE EL PACÍFICO"],
-    "ala_nubes": ["VUELO CIEGO EN TORMENTA", "RUTA LIMA A SANTIAGO"],
-    "mar_tormenta": ["01:11 AM IMPACTO EN EL MAR", "FRENTE A CHANCAY"],
-    "barco_rescate": ["BÚSQUEDA MARÍTIMA NOCTURNA", "OPERATIVO DE RESCATE"],
-    "caja_negra": ["CAJA NEGRA RECUPERADA", "DATOS DEL REGISTRADOR FDR"],
-    "hangar": ["INVESTIGACIÓN OFICIAL CIAA", "DOBLE INSPECCIÓN PREVUELO"],
-    "avion_frontal": ["31 MINUTOS DE VUELO CIEGO", "SIN SOBREVIVIENTES"],
-    "torre_noche": ["RADAR DE LIMA ENGAÑADO", "VECTORES DE REGRESO"],
+    "pista_lluvia": ["DESPEGUE 00:40 AM LIMA", "PISTA BAJO NIEBLA DENSA", "SALIDA NOCTURNA EN PERÚ"],
+    "turbina": ["BOEING 757-200 N52AW", "ASCENSO SOBRE EL PACÍFICO", "MOTORES A POTENCIA NOMINAL"],
+    "ala_nubes": ["VUELO CIEGO EN TORMENTA", "RUTA LIMA A SANTIAGO", "SIN REFERENCIA VISUAL"],
+    "mar_tormenta": ["01:11 AM IMPACTO EN EL MAR", "FRENTE A CHANCAY", "DESCENSO SIN CONTROL"],
+    "barco_rescate": ["BÚSQUEDA MARÍTIMA NOCTURNA", "OPERATIVO DE RESCATE", "RASTREO EN EL PACÍFICO"],
+    "caja_negra": ["CAJA NEGRA RECUPERADA", "DATOS DEL REGISTRADOR FDR", "GRABACIONES ANALIZADAS"],
+    "hangar": ["INVESTIGACIÓN OFICIAL CIAA", "DOBLE INSPECCIÓN PREVUELO", "PROTOCOLOS REFORZADOS OACI"],
+    "avion_frontal": ["31 MINUTOS DE VUELO CIEGO", "SIN SOBREVIVIENTES", "70 VIDAS PERDIDAS"],
+    "torre_noche": ["RADAR DE LIMA ENGAÑADO", "VECTORES DE REGRESO", "CONTROL AÉREO EN ALERTA"],
 }
 
 CORRECCIONES = {
@@ -113,6 +113,19 @@ def _asignar_plano_semantico(esc: dict, idx: int) -> str:
     return claves_all[idx % len(claves_all)]
 
 
+def _elegir_rotulo(plano: str, uso_rotulos_plano: Counter, rotulos_globales: set) -> str:
+    opciones = ROTULOS_POR_PLANO[plano]
+    rot = opciones[uso_rotulos_plano[plano] % len(opciones)]
+    uso_rotulos_plano[plano] += 1
+    if rot in rotulos_globales:
+        for alt in opciones:
+            if alt not in rotulos_globales:
+                rot = alt
+                break
+    rotulos_globales.add(rot)
+    return rot
+
+
 def _validar_escenas(escenas_brutas: list) -> list:
     filtradas, vistas = [], set()
     for esc in escenas_brutas:
@@ -135,29 +148,16 @@ def _validar_escenas(escenas_brutas: list) -> list:
 
     for idx, esc in enumerate(filtradas):
         plano = _asignar_plano_semantico(esc, idx)
-        lim = 3 if plano == "cinta_puerto" else 2
-        if uso_planos[plano] >= lim or plano == plano_ant:
+        if uso_planos[plano] >= 3 or plano == plano_ant:
             cands = sorted(BANCO_PLANOS.keys(), key=lambda p: uso_planos[p])
             for c in cands:
-                lim_c = 3 if c == "cinta_puerto" else 2
-                if c != plano_ant and uso_planos[c] < lim_c:
+                if c != plano_ant:
                     plano = c
                     break
 
         uso_planos[plano] += 1
         plano_ant = plano
-
-        # Rótulo 100% vinculado al plano elegido (nunca desajustado ni cortado)
-        opciones = ROTULOS_POR_PLANO[plano]
-        rot = opciones[uso_rotulos_plano[plano] % len(opciones)]
-        uso_rotulos_plano[plano] += 1
-        if rot in rotulos_globales:
-            for alt in opciones:
-                if alt not in rotulos_globales:
-                    rot = alt
-                    break
-        rotulos_globales.add(rot)
-
+        rot = _elegir_rotulo(plano, uso_rotulos_plano, rotulos_globales)
         esc.update({
             "texto_pantalla": rot,
             "tipo": "imagen",
@@ -165,8 +165,8 @@ def _validar_escenas(escenas_brutas: list) -> list:
             "prompt_imagen": BANCO_PLANOS[plano],
         })
 
-    # Asegurar 3 apariciones clave de cinta_puerto (flashback limpieza, despegue tapado, hallazgo informe)
-    for pos, rot_cinta in [(4, "CINTA SOBRE PUERTOS ESTÁTICOS"), (9, "3 SENSORES BLOQUEADOS"), (29, "CINTA CAMUFLADA PROHIBIDA")]:
+    # 3 apariciones clave de cinta_puerto
+    for pos, rot_cinta in [(4, "CINTA SOBRE PUERTOS ESTÁTICOS"), (10, "3 SENSORES BLOQUEADOS"), (29, "CINTA CAMUFLADA PROHIBIDA")]:
         if pos < len(filtradas):
             filtradas[pos].update({
                 "tipo": "imagen",
@@ -192,6 +192,23 @@ def _validar_escenas(escenas_brutas: list) -> list:
         if pos < total:
             usadas.add(pos)
             filtradas[pos].update({"tipo": "grafico", "plano": "grafico", "prompt_imagen": cod, "texto_pantalla": rot})
+
+    # Barrido final anti-adyacencia: garantiza que NUNCA haya dos escenas seguidas con el mismo plano
+    conteo_final = Counter(e["plano"] for e in filtradas if e["plano"] != "grafico")
+    for i in range(1, len(filtradas)):
+        actual = filtradas[i]["plano"]
+        if actual != "grafico" and actual == filtradas[i - 1]["plano"]:
+            siguiente = filtradas[i + 1]["plano"] if i + 1 < len(filtradas) else ""
+            for cand in sorted(BANCO_PLANOS.keys(), key=lambda p: conteo_final[p]):
+                if cand != actual and cand != siguiente:
+                    conteo_final[actual] -= 1
+                    conteo_final[cand] += 1
+                    filtradas[i].update({
+                        "plano": cand,
+                        "prompt_imagen": BANCO_PLANOS[cand],
+                        "texto_pantalla": _elegir_rotulo(cand, uso_rotulos_plano, rotulos_globales),
+                    })
+                    break
 
     return filtradas
 
