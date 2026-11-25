@@ -1,14 +1,23 @@
 import os
+import json
 import py_compile
 import shutil
 import subprocess
-import sys
 
 ARCHIVOS_REQUERIDOS = [
     "pipeline_auto.py",
     "generar_guion.py",
     "generar_imagen.py",
     "montar_video.py",
+]
+
+PREFIJOS_TEST = [
+    "Primero", "Segundo", "Tercero", "Cuarto", "Quinto", "Sexto", "Septimo",
+    "Octavo", "Noveno", "Decimo", "Undecimo", "Duodecimo", "Trece", "Catorce",
+    "Quince", "Dieciseis", "Diecisiete", "Dieciocho", "Diecinueve", "Veinte",
+    "Veintiuno", "Veintidos", "Veintitres", "Veinticuatro", "Veinticinco",
+    "Veintiseis", "Veintisiete", "Veintiocho", "Veintinueve", "Treinta",
+    "Treintaiuno", "Treintaidos", "Treintaitres", "Treintaicuatro",
 ]
 
 
@@ -37,11 +46,15 @@ def verificar_coherencia_guion():
         "tags_youtube": ["test"],
         "comentario_fijado": "Test",
         "escenas": [
-            {"texto_narracion": f"Escena documental numero {i} sobre el vuelo Aeroperu 603 en Lima.", "texto_pantalla": "ADHESIVO PLATEADO", "plano": "cabina_pilotos"}
+            {
+                "texto_narracion": f"{PREFIJOS_TEST[i]} bloque documental verificado sobre el vuelo Aeroperu en Lima.",
+                "texto_pantalla": "ADHESIVO PLATEADO",
+                "plano": "cabina_pilotos",
+            }
             for i in range(34)
         ],
     }
-    res = gg._parsear_guion(__import__("json").dumps(muestra), gg.FICHA_POR_DEFECTO)
+    res = gg._parsear_guion(json.dumps(muestra), gg.FICHA_POR_DEFECTO)
     escenas = res["escenas"]
     assert len(escenas) == 34, f"Se esperaban 34 escenas, salieron {len(escenas)}"
 
@@ -55,16 +68,16 @@ def verificar_coherencia_guion():
         if escenas[i]["plano"] != "grafico":
             assert escenas[i]["plano"] != escenas[i - 1]["plano"], f"Plano repetido seguido en {i}"
 
-    # Probar generación real de una infografía 1080p
     tmp_img = "/tmp/test_infografia.png"
     assert gi.generar_imagen("INFOGRAFIA:GRAFICA_ALTITUD", tmp_img), "Falló infografía de altitud"
-    os.remove(tmp_img)
+    if os.path.exists(tmp_img):
+        os.remove(tmp_img)
     print("✅ Reglas de guion, 6 infografías y plano cinta_puerto verificados.")
 
 
 def verificar_limitador_audio():
     tmp_wav = "/tmp/test_tone.wav"
-    tmp_out = "/tmp/test_limited.mp4"
+    tmp_out = "/tmp/test_limited.m4a"
     subprocess.run(
         ["ffmpeg", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=2", "-af", "volume=3dB", tmp_wav],
         capture_output=True,
