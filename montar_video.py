@@ -42,7 +42,7 @@ def _concatenar_video(rutas_clips: list, ruta_salida: str):
 
 def _normalizar_audio_dos_pasadas(audio_entrada: str, salida_m4a: str):
     p1 = subprocess.run(
-        ["ffmpeg", "-y", "-i", audio_entrada, "-af", "loudnorm=I=-16:TP=-2.0:LRA=11:print_format=json", "-f", "null", "-"],
+        ["ffmpeg", "-y", "-i", audio_entrada, "-af", "loudnorm=I=-16:TP=-2.5:LRA=11:print_format=json", "-f", "null", "-"],
         capture_output=True,
         text=True,
     )
@@ -50,13 +50,13 @@ def _normalizar_audio_dos_pasadas(audio_entrada: str, salida_m4a: str):
     if match:
         stats = json.loads(match.group(0))
         filtro = (
-            f"loudnorm=I=-16:TP=-2.0:LRA=11:measured_I={stats['input_i']}:"
+            f"loudnorm=I=-16:TP=-2.5:LRA=11:measured_I={stats['input_i']}:"
             f"measured_LRA={stats['input_lra']}:measured_TP={stats['input_tp']}:"
             f"measured_thresh={stats['input_thresh']}:offset={stats['target_offset']}:linear=true,"
-            "alimiter=level_in=1:level_out=1:limit=0.84:attack=5:release=50:level=disabled"
+            "alimiter=level_in=1:level_out=1:limit=0.78:attack=5:release=50:level=disabled"
         )
     else:
-        filtro = "loudnorm=I=-16:TP=-2.5:LRA=11,alimiter=level_in=1:level_out=1:limit=0.84:attack=5:release=50:level=disabled"
+        filtro = "loudnorm=I=-16:TP=-2.5:LRA=11,alimiter=level_in=1:level_out=1:limit=0.78:attack=5:release=50:level=disabled"
 
     subprocess.run(["ffmpeg", "-y", "-i", audio_entrada, "-af", filtro, "-c:a", "aac", "-b:a", "192k", salida_m4a], capture_output=True)
 
