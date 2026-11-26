@@ -15,13 +15,13 @@ FICHA_POR_DEFECTO = {
     "avion": "Boeing 757-200 (matrícula N52AW)",
     "ruta": "Lima (Perú) a Santiago (Chile)",
     "ocupantes": "70 personas (61 pasajeros y 9 tripulantes, sin sobrevivientes)",
-    "causa_oficial": "Un operario de limpieza cubrió los 3 puertos estáticos del lado izquierdo con cinta adhesiva plateada y nadie la retiró antes del despegue (Informe Final CIAA).",
+    "causa_oficial": "Un operario de limpieza cubrió los 3 puertos estáticos del lado izquierdo del fuselaje con cinta adhesiva plateada y nadie la retiró antes del despegue (Informe Final CIAA).",
     "cronologia": [
         {"hora": "00:40 AM", "hecho": "Despegue desde el aeropuerto de Lima bajo niebla densa"},
         {"hora": "00:42 AM", "hecho": "Velocímetro y altímetro muestran lecturas erróneas en ascenso"},
         {"hora": "00:44 AM", "hecho": "La tripulación declara emergencia y pide vectores de regreso"},
         {"hora": "00:58 AM", "hecho": "El radar de Lima lee 9700 pies falsos enviados por el transpondedor"},
-        {"hora": "01:11 AM", "hecho": "El ala izquierda golpea el mar frente a Chancay tras 31 minutos de vuelo"},
+        {"hora": "01:11 AM", "hecho": "El ala izquierda golpea el mar frente a la costa de Lima tras 31 minutos de vuelo"},
     ],
     "consecuencias": [
         "Prohibición de cinta camuflada y uso obligatorio de cubiertas de alta visibilidad con banderines",
@@ -34,7 +34,7 @@ FICHA_POR_DEFECTO = {
 }
 
 BANCO_PLANOS = {
-    "cinta_puerto": "Extreme macro close-up of wrinkled silver metallic duct tape wrapped over and completely sealing a round chrome static port sensor on a smooth matte dark blue aircraft fuselage, warm directional spotlight, shallow depth of field",
+    "cinta_puerto": "Extreme macro close-up of silver metallic duct tape wrapped over and completely sealing a round chrome static port sensor on a smooth matte dark blue aircraft fuselage, warm directional spotlight, shallow depth of field",
     "cabina_pilotos": "Dark cinematic view from behind empty cockpit seats looking through windshield into dense night fog and distant lightning over the black ocean, moody blue instrument glow, smooth unmarked surfaces",
     "ala_nubes": "Close-up of a commercial airliner wingtip with red navigation strobe light cutting through dense dark storm clouds and rain at night, dramatic rim lighting, smooth unmarked metal",
     "pista_lluvia": "Low angle shot of wet dark airport runway centerlines reflecting distant amber lights in dense night fog, dark vignette at bottom edge, smooth wet asphalt",
@@ -42,31 +42,68 @@ BANCO_PLANOS = {
     "mar_tormenta": "Dramatic low-angle close-up of a commercial airliner wingtip slicing into dark turbulent Pacific ocean waves at night sending white sea spray into the air, storm lighting",
     "barco_rescate": "Night maritime search vessel silhouette with a white searchlight beam scanning dark rough ocean waves under rain and fog, completely unmarked plain dark hull",
     "caja_negra": "Underwater spotlight illuminating a plain smooth bright orange rectangular flight data recorder box resting on dark sandy seabed, completely unmarked painted metal surface",
-    "hangar": "Wide cinematic shot of a commercial Boeing 757 parked inside a dimly lit maintenance hangar at night under overhead floodlights, smooth unmarked white and blue fuselage",
+    "hangar": "Wide side-angle cinematic shot of a commercial Boeing 757 parked inside a dimly lit maintenance hangar at night under overhead floodlights, smooth unmarked white and blue fuselage",
     "avion_frontal": "Dramatic low-angle three-quarter view of an unmarked commercial airliner climbing into dark stormy night clouds, landing lights glowing, smooth clean fuselage",
     "torre_noche": "Exterior shot of an airport air traffic control tower at night surrounded by dense mist with glowing green radar room windows, moody cinematic lighting",
 }
 
-ROTULOS_POR_PLANO = {
-    "cinta_puerto": ["CINTA SOBRE PUERTOS ESTÁTICOS", "3 SENSORES BLOQUEADOS", "CINTA CAMUFLADA PROHIBIDA"],
-    "cabina_pilotos": ["ALARMAS CONTRADICTORIAS", "ALTÍMETRO Y VELOCÍMETRO FALLAN", "EMERGENCIA EN CABINA"],
-    "pista_lluvia": ["DESPEGUE 00:40 AM LIMA", "PISTA BAJO NIEBLA DENSA", "SALIDA NOCTURNA EN PERÚ"],
-    "turbina": ["BOEING 757-200 N52AW", "ASCENSO SOBRE EL PACÍFICO", "MOTORES A POTENCIA NOMINAL"],
-    "ala_nubes": ["VUELO CIEGO EN TORMENTA", "RUTA LIMA A SANTIAGO", "SIN REFERENCIA VISUAL"],
-    "mar_tormenta": ["01:11 AM IMPACTO EN EL MAR", "FRENTE A CHANCAY", "DESCENSO SIN CONTROL"],
-    "barco_rescate": ["BÚSQUEDA MARÍTIMA NOCTURNA", "OPERATIVO DE RESCATE", "RASTREO EN EL PACÍFICO"],
-    "caja_negra": ["CAJA NEGRA RECUPERADA", "DATOS DEL REGISTRADOR FDR", "GRABACIONES ANALIZADAS"],
-    "hangar": ["INVESTIGACIÓN OFICIAL CIAA", "DOBLE INSPECCIÓN PREVUELO", "PROTOCOLOS REFORZADOS OACI"],
-    "avion_frontal": ["31 MINUTOS DE VUELO CIEGO", "SIN SOBREVIVIENTES", "70 VIDAS PERDIDAS"],
-    "torre_noche": ["RADAR DE LIMA ENGAÑADO", "VECTORES DE REGRESO", "CONTROL AÉREO EN ALERTA"],
+ROTULOS_POR_ACTO = {
+    1: {  # Escenas 0..10: Preparación en tierra y salida a pista
+        "cinta_puerto": ["CINTA SOBRE PUERTOS ESTÁTICOS", "3 SENSORES BLOQUEADOS"],
+        "cabina_pilotos": ["INSTRUMENTOS SIN REFERENCIA", "REVISIÓN PREVUELO OMITIDA"],
+        "pista_lluvia": ["DESPEGUE 00:40 AM LIMA", "PISTA BAJO NIEBLA DENSA"],
+        "turbina": ["BOEING 757-200 N52AW", "PREPARACIÓN EN AEROPUERTO"],
+        "ala_nubes": ["RUTA LIMA A SANTIAGO", "NOCHE CERRADA EN LIMA"],
+        "hangar": ["MANTENIMIENTO EN HANGAR", "INSPECCIÓN VISUAL INCOMPLETA"],
+        "avion_frontal": ["SALIDA NOCTURNA EN PERÚ", "VUELO AEROPERÚ 603"],
+        "torre_noche": ["TORRE DE CONTROL LIMA", "AUTORIZACIÓN DE DESPEGUE"],
+        "mar_tormenta": ["RUTA SOBRE EL PACÍFICO", "SIN REFERENCIA VISUAL"],
+        "barco_rescate": ["COSTA DEL PACÍFICO PERUANO", "NOCHE DE NIEBLA DENSA"],
+        "caja_negra": ["SENSORES DE PRESIÓN SELLADOS", "DATOS ERRÓNEOS EN ORIGEN"],
+    },
+    2: {  # Escenas 11..26: Emergencia en vuelo, radar engañado e impacto
+        "cinta_puerto": ["PUERTOS ESTÁTICOS SELLADOS", "PRESIÓN ATMOSFÉRICA BLOQUEADA"],
+        "cabina_pilotos": ["ALARMAS CONTRADICTORIAS", "ALTÍMETRO Y VELOCÍMETRO FALLAN", "EMERGENCIA EN CABINA"],
+        "pista_lluvia": ["REGRESO DE EMERGENCIA", "APROXIMACIÓN A CIEGAS"],
+        "turbina": ["ASCENSO SOBRE EL PACÍFICO", "PÉRDIDA DE VELOCIDAD REAL"],
+        "ala_nubes": ["VUELO CIEGO EN TORMENTA", "SIN REFERENCIA VISUAL"],
+        "mar_tormenta": ["01:11 AM IMPACTO EN EL MAR", "FRENTE A LA COSTA DE LIMA", "DESCENSO SIN CONTROL"],
+        "barco_rescate": ["ALERTA EN EL PACÍFICO", "BÚSQUEDA DE EMERGENCIA"],
+        "caja_negra": ["REGISTRO DE VUELO FDR", "ALTITUD REAL EN DESCENSO"],
+        "hangar": ["FALLO DE INSTRUMENTACIÓN", "LECTURAS IMPOSIBLES"],
+        "avion_frontal": ["31 MINUTOS DE VUELO CIEGO", "TRAYECTORIA ERRÓNEA"],
+        "torre_noche": ["RADAR DE LIMA ENGAÑADO", "VECTORES DE REGRESO", "9700 PIES FALSOS"],
+    },
+    3: {  # Escenas 27..33: Rescate, caja negra, investigación CIAA y normas OACI
+        "cinta_puerto": ["CINTA CAMUFLADA PROHIBIDA", "CAUSA OFICIAL DEL ACCIDENTE"],
+        "cabina_pilotos": ["LECCIÓN DE SEGURIDAD AÉREA", "PROTOCOLOS DE CABINA"],
+        "pista_lluvia": ["VERIFICACIÓN ANTES DEL RODAJE", "CONTROLES OBLIGATORIOS"],
+        "turbina": ["INFORME TÉCNICO FINAL", "REVISIÓN DE AERONAVES"],
+        "ala_nubes": ["70 VIDAS PERDIDAS", "SIN SOBREVIVIENTES"],
+        "mar_tormenta": ["ZONA DEL IMPACTO EN EL MAR", "RESTOS EN EL PACÍFICO"],
+        "barco_rescate": ["BÚSQUEDA MARÍTIMA NOCTURNA", "OPERATIVO DE RESCATE"],
+        "caja_negra": ["CAJA NEGRA RECUPERADA", "DATOS DEL REGISTRADOR FDR"],
+        "hangar": ["INVESTIGACIÓN OFICIAL CIAA", "DOBLE INSPECCIÓN PREVUELO"],
+        "avion_frontal": ["PROTOCOLOS REFORZADOS OACI", "70 PERSONAS A BORDO"],
+        "torre_noche": ["CONTROL AÉREO EN ALERTA", "REGISTRO RADAR ANALIZADO"],
+    },
 }
 
 CORRECCIONES = {
-    r"\bOCCUPANTES\b": "OCUPANTES", r"\bNIEBLA DENSAS\b": "NIEBLA DENSA",
-    r"\bIMPÁCTO\b": "IMPACTO", r"\bAEROPERU\b": "AEROPERÚ",
-    r"\bFUSELAGE\b": "FUSELAJE", r"\bRESCUE\b": "RESCATE",
-    r"\bla ala\b": "el ala", r"\b9\.700\b": "9700",
-    r"\btubos?\s+pitot\b": "puertos estáticos", r"\bpitot\b": "puerto estático",
+    r"\bOCCUPANTES\b": "OCUPANTES",
+    r"\bNIEBLA DENSAS\b": "NIEBLA DENSA",
+    r"\bIMPÁCTO\b": "IMPACTO",
+    r"\bAEROPERU\b": "AEROPERÚ",
+    r"\bFUSELAGE\b": "FUSELAJE",
+    r"\bRESCUE\b": "RESCATE",
+    r"puertos estáticos del ala izquierda": "puertos estáticos del fuselaje izquierdo",
+    r"la izquierda del ala": "el ala izquierda",
+    r"\bla ala\b": "el ala",
+    r"\b9\.700\b": "9700",
+    r"\b12:40\b": "00:40",
+    r"\b2:58\b": "00:58",
+    r"\btubos?\s+pitot\b": "puertos estáticos",
+    r"\bpitot\b": "puerto estático",
 }
 
 
@@ -87,6 +124,14 @@ def _cargar_ficha() -> dict:
         except Exception:
             pass
     return FICHA_POR_DEFECTO
+
+
+def _acto_de_escena(idx: int) -> int:
+    if idx <= 10:
+        return 1
+    if idx <= 26:
+        return 2
+    return 3
 
 
 def _asignar_plano_semantico(esc: dict, idx: int) -> str:
@@ -113,17 +158,14 @@ def _asignar_plano_semantico(esc: dict, idx: int) -> str:
     return claves_all[idx % len(claves_all)]
 
 
-def _elegir_rotulo(plano: str, uso_rotulos_plano: Counter, rotulos_globales: set) -> str:
-    opciones = ROTULOS_POR_PLANO[plano]
-    rot = opciones[uso_rotulos_plano[plano] % len(opciones)]
-    uso_rotulos_plano[plano] += 1
-    if rot in rotulos_globales:
-        for alt in opciones:
-            if alt not in rotulos_globales:
-                rot = alt
-                break
-    rotulos_globales.add(rot)
-    return rot
+def _elegir_rotulo_contextual(idx: int, plano: str, rotulos_globales: set) -> str:
+    acto = _acto_de_escena(idx)
+    opciones = ROTULOS_POR_ACTO[acto][plano]
+    for cand in opciones:
+        if cand not in rotulos_globales:
+            rotulos_globales.add(cand)
+            return cand
+    return opciones[idx % len(opciones)]
 
 
 def _validar_escenas(escenas_brutas: list) -> list:
@@ -142,22 +184,23 @@ def _validar_escenas(escenas_brutas: list) -> list:
 
     filtradas = filtradas[:34]
     uso_planos = Counter()
-    uso_rotulos_plano = Counter()
     rotulos_globales = set()
     plano_ant = ""
 
     for idx, esc in enumerate(filtradas):
         plano = _asignar_plano_semantico(esc, idx)
-        if uso_planos[plano] >= 3 or plano == plano_ant:
+        max_uso = 3 if plano == "cinta_puerto" else (2 if plano == "hangar" else 3)
+        if uso_planos[plano] >= max_uso or plano == plano_ant:
             cands = sorted(BANCO_PLANOS.keys(), key=lambda p: uso_planos[p])
             for c in cands:
-                if c != plano_ant:
+                lim_c = 2 if c == "hangar" else 3
+                if c != plano_ant and uso_planos[c] < lim_c:
                     plano = c
                     break
 
         uso_planos[plano] += 1
         plano_ant = plano
-        rot = _elegir_rotulo(plano, uso_rotulos_plano, rotulos_globales)
+        rot = _elegir_rotulo_contextual(idx, plano, rotulos_globales)
         esc.update({
             "texto_pantalla": rot,
             "tipo": "imagen",
@@ -165,7 +208,6 @@ def _validar_escenas(escenas_brutas: list) -> list:
             "prompt_imagen": BANCO_PLANOS[plano],
         })
 
-    # 3 apariciones clave de cinta_puerto
     for pos, rot_cinta in [(4, "CINTA SOBRE PUERTOS ESTÁTICOS"), (10, "3 SENSORES BLOQUEADOS"), (29, "CINTA CAMUFLADA PROHIBIDA")]:
         if pos < len(filtradas):
             filtradas[pos].update({
@@ -175,7 +217,6 @@ def _validar_escenas(escenas_brutas: list) -> list:
                 "texto_pantalla": rot_cinta,
             })
 
-    # 6 gráficos distintos garantizados y equidistantes
     total = len(filtradas)
     graficos = [
         (max(2, int(total * 0.09)), "INFOGRAFIA:TARJETA_VUELO", "70 OCUPANTES A BORDO"),
@@ -193,7 +234,6 @@ def _validar_escenas(escenas_brutas: list) -> list:
             usadas.add(pos)
             filtradas[pos].update({"tipo": "grafico", "plano": "grafico", "prompt_imagen": cod, "texto_pantalla": rot})
 
-    # Barrido final anti-adyacencia: garantiza que NUNCA haya dos escenas seguidas con el mismo plano
     conteo_final = Counter(e["plano"] for e in filtradas if e["plano"] != "grafico")
     for i in range(1, len(filtradas)):
         actual = filtradas[i]["plano"]
@@ -206,7 +246,7 @@ def _validar_escenas(escenas_brutas: list) -> list:
                     filtradas[i].update({
                         "plano": cand,
                         "prompt_imagen": BANCO_PLANOS[cand],
-                        "texto_pantalla": _elegir_rotulo(cand, uso_rotulos_plano, rotulos_globales),
+                        "texto_pantalla": _elegir_rotulo_contextual(i, cand, rotulos_globales),
                     })
                     break
 
@@ -241,9 +281,9 @@ def generar_guion(tema: str) -> dict:
     cliente = Groq(api_key=api_key)
     ficha = _cargar_ficha()
     sys_prompt = (
-        f"Director documental de aviación. Escribe un guion de exactamente 34 escenas (16 a 22 palabras por escena) basado SOLO en esta ficha (NO inventes años como 2023 ni menciones pitot, son puertos estáticos):\n"
+        f"Director documental de aviación. Escribe un guion de exactamente 34 escenas (16 a 22 palabras por escena) basado SOLO en esta ficha (los puertos estáticos están en el fuselaje izquierdo, NO en el ala; horas exactas 00:40 AM y 00:58 AM):\n"
         f"{json.dumps(ficha, ensure_ascii=False)}\n"
-        f"Bloques: 1-3 clímax 01:10 AM; 4-10 cinta en puertos estáticos; 11-18 despegue 00:40 AM y emergencia; 19-26 9700 pies falsos e impacto 01:11 AM; 27-31 caja negra e informe CIAA; 32-34 normas OACI y pregunta final.\n"
+        f"Bloques: 1-3 clímax 01:10 AM; 4-10 cinta en puertos estáticos del fuselaje; 11-18 despegue 00:40 AM y emergencia; 19-26 9700 pies falsos a las 00:58 AM e impacto 01:11 AM; 27-31 caja negra e informe CIAA; 32-34 normas OACI y pregunta final.\n"
         f"Devuelve SOLO JSON con: titulo_video, descripcion_youtube, tags_youtube, comentario_fijado, escenas:[{{texto_narracion, texto_pantalla, plano}}]."
     )
     msgs = [{"role": "system", "content": sys_prompt}, {"role": "user", "content": f"Tema: {tema}"}]
