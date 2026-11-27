@@ -61,7 +61,7 @@ ROTULOS_POR_ACTO = {
         "barco_rescate": ["COSTA DEL PACÍFICO PERUANO", "NOCHE DE NIEBLA DENSA"],
         "caja_negra": ["SENSORES DE PRESIÓN SELLADOS", "DATOS ERRÓNEOS EN ORIGEN"],
     },
-    2: {  # Escenas 11..26: Emergencia en vuelo, radar engañado e impacto
+    2: {  # Escenas 11..24: Emergencia en vuelo, radar engañado e impacto
         "cinta_puerto": ["PUERTOS ESTÁTICOS SELLADOS", "PRESIÓN ATMOSFÉRICA BLOQUEADA"],
         "cabina_pilotos": ["ALARMAS CONTRADICTORIAS", "ALTÍMETRO Y VELOCÍMETRO FALLAN", "EMERGENCIA EN CABINA"],
         "pista_lluvia": ["REGRESO DE EMERGENCIA", "APROXIMACIÓN A CIEGAS"],
@@ -74,8 +74,8 @@ ROTULOS_POR_ACTO = {
         "avion_frontal": ["31 MINUTOS DE VUELO CIEGO", "TRAYECTORIA ERRÓNEA"],
         "torre_noche": ["RADAR DE LIMA ENGAÑADO", "VECTORES DE REGRESO", "9700 PIES FALSOS"],
     },
-    3: {  # Escenas 27..33: Rescate, caja negra, investigación CIAA y normas OACI
-        "cinta_puerto": ["CINTA CAMUFLADA PROHIBIDA", "CAUSA OFICIAL DEL ACCIDENTE"],
+    3: {  # Escenas 25..33: Rescate, caja negra, investigación CIAA y normas OACI
+        "cinta_puerto": ["CINTA PROHIBIDA TRAS EL CASO", "CAUSA OFICIAL DEL ACCIDENTE"],
         "cabina_pilotos": ["LECCIÓN DE SEGURIDAD AÉREA", "PROTOCOLOS DE CABINA"],
         "pista_lluvia": ["VERIFICACIÓN ANTES DEL RODAJE", "CONTROLES OBLIGATORIOS"],
         "turbina": ["INFORME TÉCNICO FINAL", "REVISIÓN DE AERONAVES"],
@@ -84,7 +84,7 @@ ROTULOS_POR_ACTO = {
         "barco_rescate": ["BÚSQUEDA MARÍTIMA NOCTURNA", "OPERATIVO DE RESCATE"],
         "caja_negra": ["CAJA NEGRA RECUPERADA", "DATOS DEL REGISTRADOR FDR"],
         "hangar": ["INVESTIGACIÓN OFICIAL CIAA", "DOBLE INSPECCIÓN PREVUELO"],
-        "avion_frontal": ["PROTOCOLOS REFORZADOS OACI", "70 PERSONAS A BORDO"],
+        "avion_frontal": ["NORMAS REFORZADAS OACI", "70 PERSONAS A BORDO"],
         "torre_noche": ["CONTROL AÉREO EN ALERTA", "REGISTRO RADAR ANALIZADO"],
     },
 }
@@ -129,33 +129,36 @@ def _cargar_ficha() -> dict:
 def _acto_de_escena(idx: int) -> int:
     if idx <= 10:
         return 1
-    if idx <= 26:
+    if idx <= 24:
         return 2
     return 3
 
 
 def _asignar_plano_semantico(esc: dict, idx: int) -> str:
     txt = f"{esc.get('texto_narracion', '')} {esc.get('texto_pantalla', '')}".lower()
+    acto = _acto_de_escena(idx)
     reglas = [
         (("cinta", "puerto", "estático", "sensor", "lavado", "operario", "cubierta", "bander", "adhesiv"), "cinta_puerto"),
-        (("impact", "olas", "superficie", "chancay", "golpea el mar", "sumerge"), "mar_tormenta"),
-        (("caja negra", "grabadora", "registrador", "fdr", "módulos de vuelo"), "caja_negra"),
+        (("impact", "golpea el mar", "superficie del océano", "hunden"), "mar_tormenta"),
+        (("caja negra", "grabadora", "registrador", "fdr"), "caja_negra"),
         (("rescate", "barco", "búsqueda", "escombros"), "barco_rescate"),
         (("cabina", "piloto", "tripulación", "alarma", "altímetro", "velocímetro", "stick"), "cabina_pilotos"),
         (("torre", "radar", "controlador", "vectores", "transpondedor"), "torre_noche"),
         (("pista", "despeg", "jorge chávez", "niebla"), "pista_lluvia"),
-        (("ciaa", "investig", "informe", "hangar", "inspección", "verificación", "oaci"), "hangar"),
+        (("ciaa", "investig", "informe", "hangar", "inspección", "verificación", "oaci", "manual"), "hangar"),
         (("turbina", "motor", "boeing 757"), "turbina"),
         (("nubes", "ala", "tormenta", "ruta"), "ala_nubes"),
     ]
     for claves, destino in reglas:
         if any(k in txt for k in claves):
+            if destino == "caja_negra" and acto < 3:
+                return "cabina_pilotos"
             return destino
     plano_llm = str(esc.get("plano", "")).strip().lower()
-    if plano_llm in BANCO_PLANOS:
+    if plano_llm in BANCO_PLANOS and not (plano_llm == "caja_negra" and acto < 3):
         return plano_llm
-    claves_all = list(BANCO_PLANOS.keys())
-    return claves_all[idx % len(claves_all)]
+    permitidos = [p for p in BANCO_PLANOS if p != "caja_negra" or acto == 3]
+    return permitidos[idx % len(permitidos)]
 
 
 def _elegir_rotulo_contextual(idx: int, plano: str, rotulos_globales: set) -> str:
@@ -188,10 +191,11 @@ def _validar_escenas(escenas_brutas: list) -> list:
     plano_ant = ""
 
     for idx, esc in enumerate(filtradas):
+        acto = _acto_de_escena(idx)
         plano = _asignar_plano_semantico(esc, idx)
         max_uso = 3 if plano == "cinta_puerto" else (2 if plano == "hangar" else 3)
         if uso_planos[plano] >= max_uso or plano == plano_ant:
-            cands = sorted(BANCO_PLANOS.keys(), key=lambda p: uso_planos[p])
+            cands = sorted([p for p in BANCO_PLANOS if p != "caja_negra" or acto == 3], key=lambda p: uso_planos[p])
             for c in cands:
                 lim_c = 2 if c == "hangar" else 3
                 if c != plano_ant and uso_planos[c] < lim_c:
@@ -208,8 +212,9 @@ def _validar_escenas(escenas_brutas: list) -> list:
             "prompt_imagen": BANCO_PLANOS[plano],
         })
 
-    for pos, rot_cinta in [(4, "CINTA SOBRE PUERTOS ESTÁTICOS"), (10, "3 SENSORES BLOQUEADOS"), (29, "CINTA CAMUFLADA PROHIBIDA")]:
+    for pos, rot_cinta in [(4, "CINTA SOBRE PUERTOS ESTÁTICOS"), (10, "3 SENSORES BLOQUEADOS"), (29, "CINTA PROHIBIDA TRAS EL CASO")]:
         if pos < len(filtradas):
+            rotulos_globales.add(rot_cinta)
             filtradas[pos].update({
                 "tipo": "imagen",
                 "plano": "cinta_puerto",
@@ -239,7 +244,8 @@ def _validar_escenas(escenas_brutas: list) -> list:
         actual = filtradas[i]["plano"]
         if actual != "grafico" and actual == filtradas[i - 1]["plano"]:
             siguiente = filtradas[i + 1]["plano"] if i + 1 < len(filtradas) else ""
-            for cand in sorted(BANCO_PLANOS.keys(), key=lambda p: conteo_final[p]):
+            acto_i = _acto_de_escena(i)
+            for cand in sorted([p for p in BANCO_PLANOS if p != "caja_negra" or acto_i == 3], key=lambda p: conteo_final[p]):
                 if cand != actual and cand != siguiente:
                     conteo_final[actual] -= 1
                     conteo_final[cand] += 1
@@ -283,7 +289,7 @@ def generar_guion(tema: str) -> dict:
     sys_prompt = (
         f"Director documental de aviación. Escribe un guion de exactamente 34 escenas (16 a 22 palabras por escena) basado SOLO en esta ficha (los puertos estáticos están en el fuselaje izquierdo, NO en el ala; horas exactas 00:40 AM y 00:58 AM):\n"
         f"{json.dumps(ficha, ensure_ascii=False)}\n"
-        f"Bloques: 1-3 clímax 01:10 AM; 4-10 cinta en puertos estáticos del fuselaje; 11-18 despegue 00:40 AM y emergencia; 19-26 9700 pies falsos a las 00:58 AM e impacto 01:11 AM; 27-31 caja negra e informe CIAA; 32-34 normas OACI y pregunta final.\n"
+        f"Bloques: 1-3 clímax 01:10 AM; 4-10 cinta en puertos estáticos del fuselaje; 11-18 despegue 00:40 AM y emergencia; 19-24 9700 pies falsos a las 00:58 AM e impacto 01:11 AM; 25-31 rescate, caja negra e informe CIAA; 32-34 normas OACI y pregunta final.\n"
         f"Devuelve SOLO JSON con: titulo_video, descripcion_youtube, tags_youtube, comentario_fijado, escenas:[{{texto_narracion, texto_pantalla, plano}}]."
     )
     msgs = [{"role": "system", "content": sys_prompt}, {"role": "user", "content": f"Tema: {tema}"}]
